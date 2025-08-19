@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
-    'google_ads_app',
+    'google_ads_new',
 ]
 
 MIDDLEWARE = [
@@ -83,8 +83,12 @@ WSGI_APPLICATION = 'marketing_assistant_project.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME', 'marketing_assistant_db'),
+        'USER': os.getenv('DB_USER', 'satyendra'),
+        'PASSWORD': os.getenv('DB_PASSWORD', ''),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
 
@@ -136,12 +140,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Google Ads Configuration
 GOOGLE_ADS_CONFIG = {
-    'developer_token': os.getenv("GOOGLE_DEV_TOKEN",'gWYjv6shHAwonl84JDzhpg'),
+    'developer_token': os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN",'x0dl1icO0Az5lftaiL7eFg'),
     'client_id': os.getenv('GOOGLE_ADS_CLIENT_ID', ''),
     'client_secret': os.getenv('GOOGLE_ADS_CLIENT_SECRET', ''),
     'refresh_token': os.getenv('GOOGLE_ADS_REFRESH_TOKEN', ''),
     'login_customer_id': os.getenv('GOOGLE_ADS_LOGIN_CUSTOMER_ID', ''),
 }
+
+# OpenAI Configuration for Chat Assistant
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 
 # REST Framework Configuration
 REST_FRAMEWORK = {
@@ -155,6 +162,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
 }
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:8000",
+]
 
 # CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = DEBUG

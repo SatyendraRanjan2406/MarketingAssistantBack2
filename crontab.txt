@@ -1,0 +1,26 @@
+# Google Ads Marketing Assistant - Cron Jobs Configuration
+# Add these lines to your crontab using: crontab -e
+
+# Daily sync job - runs every day at 2:00 AM
+# Syncs last week's data for all accounts
+0 2 * * * cd /path/to/your/marketing_assistant && /path/to/venv/bin/python manage.py sync_daily_data >> /var/log/google_ads_daily_sync.log 2>&1
+
+# Weekly sync job - runs every Sunday at 3:00 AM
+# Syncs historical data (curr-1 to curr-10 weeks) for all accounts
+0 3 * * 0 cd /path/to/your/marketing_assistant && /path/to/venv/bin/python manage.py sync_historical_data --all-accounts --weeks 10 >> /var/log/google_ads_weekly_sync.log 2>&1
+
+# Alternative: Sync specific account daily at 1:00 AM
+# 0 1 * * * cd /path/to/your/marketing_assistant && /path/to/venv/bin/python manage.py sync_daily_data --account-id 1 >> /var/log/google_ads_account1_sync.log 2>&1
+
+# Alternative: Sync specific account weekly on Saturday at 4:00 AM
+# 0 4 * * 6 cd /path/to/your/marketing_assistant && /path/to/venv/bin/python manage.py sync_historical_data --account-id 1 --weeks 10 >> /var/log/google_ads_account1_weekly.log 2>&1
+
+# Log rotation (optional) - runs monthly to prevent log files from getting too large
+# 0 5 1 * * find /var/log/google_ads_*.log -mtime +30 -delete
+
+# Notes:
+# - Replace /path/to/your/marketing_assistant with your actual project path
+# - Replace /path/to/venv with your virtual environment path
+# - Adjust times as needed for your timezone
+# - Monitor log files for any sync errors
+# - Ensure your Django environment variables are accessible to cron

@@ -22,7 +22,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
     # Google Ads API endpoints
-    path('google-ads/', include('google_ads_app.urls')),
+    path('google-ads-new/', include('google_ads_new.urls')),
     
     # Authentication URLs
     path('accounts/login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
