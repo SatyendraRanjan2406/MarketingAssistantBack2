@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Google Ads Marketing Assistant</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            color: #333;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .navbar h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .navbar .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background 0.3s ease;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .dashboard-header {
+            margin-bottom: 2rem;
+        }
+        
+        .dashboard-header h2 {
+            font-size: 2rem;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+        
+        .dashboard-header p {
+            color: #718096;
+            font-size: 1.1rem;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border-left: 4px solid #667eea;
+        }
+        
+        .metric-card h3 {
+            color: #718096;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2d3748;
+        }
+        
+        .metric-card .change {
+            font-size: 0.9rem;
+            color: #48bb78;
+            margin-top: 0.5rem;
+        }
+        
+        .charts-section {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .chart-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .chart-card h3 {
+            color: #2d3748;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .top-performers {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .top-performers h3 {
+            color: #2d3748;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+        
+        .performer-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .performer-item:last-child {
+            border-bottom: none;
+        }
+        
+        .performer-name {
+            font-weight: 500;
+            color: #2d3748;
+        }
+        
+        .performer-value {
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #718096;
+        }
+        
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>Google Ads Marketing Assistant</h1>
+        <div class="user-info">
+            <span>Welcome, {{ user.username }}</span>
+            <a href="{% url 'logout' %}" class="logout-btn">Logout</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="dashboard-header">
+            <h2>Dashboard</h2>
+            <p>Overview of your Google Ads performance</p>
+        </div>
+        
+        <div id="loading" class="loading">
+            Loading dashboard data...
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div id="dashboard-content" style="display: none;">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h3>Total Spend</h3>
+                    <div class="value" id="total-spend">$0.00</div>
+                    <div class="change">+0% from last period</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Impressions</h3>
+                    <div class="value" id="total-impressions">0</div>
+                    <div class="change">+0% from last period</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Clicks</h3>
+                    <div class="value" id="total-clicks">0</div>
+                    <div class="change">+0% from last period</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Conversions</h3>
+                    <div class="value" id="total-conversions">0</div>
+                    <div class="change">+0% from last period</div>
+                </div>
+                <div class="metric-card">
+                    <h3>CTR</h3>
+                    <div class="value" id="overall-ctr">0%</div>
+                    <div class="change">+0% from last period</div>
+                </div>
+                <div class="metric-card">
+                    <h3>ROAS</h3>
+                    <div class="value" id="overall-roas">0.00</div>
+                    <div class="change">+0% from last period</div>
+                </div>
+            </div>
+            
+            <div class="charts-section">
+                <div class="chart-card">
+                    <h3>Performance Trend</h3>
+                    <div class="chart-container">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="top-performers">
+                    <h3>Top Campaigns</h3>
+                    <div id="top-campaigns">
+                        <div class="performer-item">
+                            <span class="performer-name">Loading...</span>
+                            <span class="performer-value">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="charts-section">
+                <div class="chart-card">
+                    <h3>Top Keywords</h3>
+                    <div class="chart-container">
+                        <canvas id="keywordsChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="top-performers">
+                    <h3>Account Summary</h3>
+                    <div id="account-summary">
+                        <div class="performer-item">
+                            <span class="performer-name">Total Accounts</span>
+                            <span class="performer-value" id="total-accounts">0</span>
+                        </div>
+                        <div class="performer-item">
+                            <span class="performer-name">Total Campaigns</span>
+                            <span class="performer-value" id="total-campaigns">0</span>
+                        </div>
+                        <div class="performer-item">
+                            <span class="performer-name">Active Campaigns</span>
+                            <span class="performer-value" id="active-campaigns">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Dashboard functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboardData();
+        });
+        
+        async function loadDashboardData() {
+            try {
+                const response = await fetch('/google-ads/api/dashboard/');
+                if (!response.ok) {
+                    throw new Error('Failed to load dashboard data');
+                }
+                
+                const data = await response.json();
+                
+                // Hide loading and show content
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dashboard-content').style.display = 'block';
+                
+                // Update metrics
+                updateMetrics(data);
+                
+                // Create charts
+                createPerformanceChart(data.performance_trend);
+                createKeywordsChart(data.top_keywords);
+                
+                // Update top performers
+                updateTopCampaigns(data.top_campaigns);
+                updateAccountSummary(data);
+                
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').textContent = 'Failed to load dashboard data: ' + error.message;
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+        
+        function updateMetrics(data) {
+            document.getElementById('total-spend').textContent = '$' + parseFloat(data.total_spend).toFixed(2);
+            document.getElementById('total-impressions').textContent = data.total_impressions.toLocaleString();
+            document.getElementById('total-clicks').textContent = data.total_clicks.toLocaleString();
+            document.getElementById('total-conversions').textContent = data.total_conversions.toLocaleString();
+            document.getElementById('overall-ctr').textContent = (parseFloat(data.overall_ctr) * 100).toFixed(2) + '%';
+            document.getElementById('overall-roas').textContent = parseFloat(data.overall_roas).toFixed(2);
+        }
+        
+        function createPerformanceChart(performanceData) {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: performanceData.map(item => item.date),
+                    datasets: [{
+                        label: 'Impressions',
+                        data: performanceData.map(item => item.impressions),
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Clicks',
+                        data: performanceData.map(item => item.clicks),
+                        borderColor: '#48bb78',
+                        backgroundColor: 'rgba(72, 187, 120, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createKeywordsChart(keywordsData) {
+            const ctx = document.getElementById('keywordsChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: keywordsData.map(item => item.text),
+                    datasets: [{
+                        data: keywordsData.map(item => item.spend),
+                        backgroundColor: [
+                            '#667eea',
+                            '#764ba2',
+                            '#f093fb',
+                            '#f5576c',
+                            '#4facfe'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateTopCampaigns(campaigns) {
+            const container = document.getElementById('top-campaigns');
+            container.innerHTML = '';
+            
+            campaigns.forEach(campaign => {
+                const item = document.createElement('div');
+                item.className = 'performer-item';
+                item.innerHTML = `
+                    <span class="performer-name">${campaign.name}</span>
+                    <span class="performer-value">$${parseFloat(campaign.spend).toFixed(2)}</span>
+                `;
+                container.appendChild(item);
+            });
+        }
+        
+        function updateAccountSummary(data) {
+            document.getElementById('total-accounts').textContent = data.total_accounts;
+            document.getElementById('total-campaigns').textContent = data.total_campaigns;
+            // You can add more summary data here
+        }
+    </script>
+</body>
+</html>

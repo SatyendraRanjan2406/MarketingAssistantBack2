@@ -1,0 +1,136 @@
+GOOGLE ADS MARKETING ASSISTANT - DATABASE SCHEMA DIAGRAM
+================================================================================
+
+USER (Django Auth)
+    │
+    │ 1:N
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        GOOGLE_ADS_ACCOUNT                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
+│  │     id      │  │ customer_id│  │account_name│  │currency_code│      │
+│  │ username   │  │ time_zone  │  │ is_active  │  │created_at  │      │
+│  │ email      │  │updated_at  │  │            │  │            │      │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘      │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    │ 1:N
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        GOOGLE_ADS_CAMPAIGN                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
+│  │     id      │  │campaign_id │  │campaign_name│  │campaign_status│     │
+│  │campaign_type│  │ start_date │  │  end_date  │  │budget_amount│      │
+│  │ budget_type│  │created_at  │  │updated_at  │  │            │      │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘      │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    │ 1:N
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        GOOGLE_ADS_AD_GROUP                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
+│  │     id      │  │ ad_group_id│  │ad_group_name│  │   status   │      │
+│  │    type    │  │created_at  │  │updated_at  │  │            │      │
+│  │            │  │            │  │            │  │            │      │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘      │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    │ 1:N
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        GOOGLE_ADS_KEYWORD                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
+│  │     id      │  │ keyword_id │  │keyword_text│  │ match_type │      │
+│  │   status   │  │quality_score│  │created_at  │  │updated_at  │      │
+│  │            │  │            │  │            │  │            │      │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                                    │
+                                    │ N:1 (Optional)
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        GOOGLE_ADS_PERFORMANCE                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
+│  │     id      │  │    date    │  │impressions │  │   clicks   │      │
+│  │cost_micros │  │conversions │  │conversion_value│  │     ctr    │      │
+│  │     cpc    │  │     cpm    │  │conversion_rate│  │     roas   │      │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+USER (Django Auth)
+    │
+    │ 1:N
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        GOOGLE_ADS_REPORT                                   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
+│  │     id      │  │    name    │  │report_type │  │   status   │      │
+│  │  schedule  │  │  last_run  │  │  next_run  │  │ parameters │      │
+│  │created_at  │  │updated_at  │  │            │  │            │      │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+GOOGLE_ADS_ACCOUNT
+    │
+    │ 1:N
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        GOOGLE_ADS_ALERT                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │
+│  │     id      │  │ alert_type │  │  severity  │  │    title   │      │
+│  │   message  │  │  is_read   │  │is_resolved │  │created_at  │      │
+│  │resolved_at │  │            │  │            │  │            │      │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+RELATIONSHIP SUMMARY:
+================================================================================
+
+HIERARCHICAL STRUCTURE (1:N):
+User → GoogleAdsAccount → GoogleAdsCampaign → GoogleAdsAdGroup → GoogleAdsKeyword
+
+PERFORMANCE TRACKING (N:1 Optional):
+GoogleAdsPerformance ← GoogleAdsAccount (Required)
+GoogleAdsPerformance ← GoogleAdsCampaign (Optional)
+GoogleAdsPerformance ← GoogleAdsAdGroup (Optional)
+GoogleAdsPerformance ← GoogleAdsKeyword (Optional)
+
+USER MANAGEMENT (1:N):
+User → GoogleAdsReport
+GoogleAdsAccount → GoogleAdsAlert
+
+================================================================================
+KEY FEATURES:
+================================================================================
+
+1. FLEXIBLE PERFORMANCE TRACKING
+   - Can track metrics at any level (account, campaign, ad group, keyword)
+   - Optional relationships allow granular or aggregated reporting
+
+2. AUDIT TRAIL
+   - All models include created_at and updated_at timestamps
+   - Performance data includes date for time-series analysis
+
+3. DATA INTEGRITY
+   - Foreign key constraints ensure referential integrity
+   - Unique constraints on business identifiers
+
+4. SCALABILITY
+   - Indexed fields for common queries
+   - Efficient aggregation queries for dashboard metrics
+
+5. EXTENSIBILITY
+   - JSON fields for flexible parameter storage
+   - Enum fields for status and type classifications
+
+================================================================================
