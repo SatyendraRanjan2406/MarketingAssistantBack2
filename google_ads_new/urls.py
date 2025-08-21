@@ -21,6 +21,7 @@ urlpatterns = [
     path('api/sync-data/', views.sync_data_view, name='google-ads-sync-data'),
     path('api/synced-data/', views.get_synced_data_view, name='google-ads-synced-data'),
     path('api/dashboard-summary/', views.dashboard_summary_view, name='google-ads-dashboard-summary'),
+    path('api/account-summary/', views.account_summary_view, name='google-ads-account-summary'),
     path('api/test-connection/', views.test_connection_view, name='google-ads-test-connection'),
     path('api/sync-logs/', views.get_sync_logs_view, name='google-ads-sync-logs'),
     
@@ -40,9 +41,14 @@ urlpatterns += [
     path('api/sync-data/', views.sync_data_view, name='sync_data'),
     path('api/get-synced-data/', views.get_synced_data_view, name='get_synced_data'),
     path('api/dashboard-summary/', views.dashboard_summary_view, name='dashboard_summary'),
+    path('api/account-summary/', views.account_summary_view, name='account_summary'),
     path('api/test-connection/', views.test_connection_view, name='test_connection'),
     path('api/sync-logs/', views.get_sync_logs_view, name='get_sync_logs'),
     path('api/request-account-access/', views.request_account_access_view, name='request_account_access'),
     path('api/pending-access-requests/', views.get_pending_access_requests_view, name='get_pending_access_requests'),
     path('api/comprehensive-sync/', views.comprehensive_sync_view, name='comprehensive_sync'),
+    path('api/sync-single-client/', views.sync_single_client_account, name='sync_single_client_account'),
+    path('api/test-single-client-sync/', views.test_single_client_sync, name='test_single_client_sync'),
+]
+
 ]

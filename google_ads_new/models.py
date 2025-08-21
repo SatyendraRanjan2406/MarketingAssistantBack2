@@ -19,6 +19,8 @@ class GoogleAdsAccount(models.Model):
     currency_code = models.CharField(max_length=3, default='USD')
     time_zone = models.CharField(max_length=50, default='America/New_York')
     is_active = models.BooleanField(default=True)
+    is_manager = models.BooleanField(default=False, help_text='True if this is a manager account (MCC) that can manage other sub-accounts')
+    is_test_account = models.BooleanField(default=False, help_text='True if this is a test/sandbox account')
     sync_status = models.CharField(max_length=20, default='pending')
     last_sync_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -253,4 +255,6 @@ class DataSyncLog(models.Model):
         if 'date_range' in self.results:
             summary_parts.append(f"Range: {self.results['date_range']}")
         
+        return ", ".join(summary_parts) if summary_parts else "Sync completed"
+
         return ", ".join(summary_parts) if summary_parts else "Sync completed"

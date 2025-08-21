@@ -1,0 +1,23 @@
+# Google OAuth Configuration
+# Get these from Google Cloud Console: https://console.cloud.google.com/
+GOOGLE_OAUTH_CLIENT_ID=your_google_oauth_client_id_here
+GOOGLE_OAUTH_CLIENT_SECRET=your_google_oauth_client_secret_here
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8000/accounts/api/google-oauth/callback/
+
+# Google Ads Configuration (existing)
+GOOGLE_ADS_DEVELOPER_TOKEN=your_developer_token_here
+GOOGLE_ADS_CLIENT_ID=your_google_ads_client_id_here
+GOOGLE_ADS_CLIENT_SECRET=your_google_ads_client_secret_here
+GOOGLE_ADS_REFRESH_TOKEN=your_google_ads_refresh_token_here
+GOOGLE_ADS_LOGIN_CUSTOMER_ID=your_google_ads_login_customer_id_here
+# Get these from Google Cloud Console: https://console.cloud.google.com/
+GOOGLE_OAUTH_CLIENT_ID=your_google_oauth_client_id_here
+GOOGLE_OAUTH_CLIENT_SECRET=your_google_oauth_client_secret_here
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8000/accounts/api/google-oauth/callback/
+
+# Google Ads Configuration (existing)
+GOOGLE_ADS_DEVELOPER_TOKEN=your_developer_token_here
+GOOGLE_ADS_CLIENT_ID=your_google_ads_client_id_here
+GOOGLE_ADS_CLIENT_SECRET=your_google_ads_client_secret_here
+GOOGLE_ADS_REFRESH_TOKEN=your_google_ads_refresh_token_here
+GOOGLE_ADS_LOGIN_CUSTOMER_ID=your_google_ads_login_customer_id_here

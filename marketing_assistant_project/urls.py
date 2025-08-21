@@ -24,7 +24,10 @@ urlpatterns = [
     # Google Ads API endpoints
     path('google-ads-new/', include('google_ads_new.urls')),
     
-    # Authentication URLs
+    # Accounts app URLs
+    path('accounts/', include('accounts.urls')),
+    
+    # Authentication URLs (fallback)
     path('accounts/login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('accounts/logout/', auth_views.LogoutView.as_view(), name='logout'),
     

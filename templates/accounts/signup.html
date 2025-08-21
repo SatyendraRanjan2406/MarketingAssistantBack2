@@ -1,0 +1,417 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - Marketing Assistant{% endblock %}
+
+{% block extra_css %}
+<style>
+    .auth-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+    }
+    
+    .auth-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        padding: 40px;
+        width: 100%;
+        max-width: 480px;
+        position: relative;
+    }
+    
+    .auth-tabs {
+        display: flex;
+        margin-bottom: 30px;
+        border-radius: 12px;
+        background: #f8f9fa;
+        padding: 4px;
+    }
+    
+    .auth-tab {
+        flex: 1;
+        padding: 12px 20px;
+        text-align: center;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 500;
+        color: #6c757d;
+    }
+    
+    .auth-tab.active {
+        background: white;
+        color: #007bff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .auth-tab:not(.active):hover {
+        color: #495057;
+    }
+    
+    .features {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    .feature-item {
+        display: inline-flex;
+        align-items: center;
+        margin: 0 15px;
+        color: #6c757d;
+        font-size: 14px;
+    }
+    
+    .feature-icon {
+        margin-right: 8px;
+        font-size: 16px;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        font-size: 16px;
+        transition: border-color 0.3s ease;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    }
+    
+    .form-control.error {
+        border-color: #dc3545;
+    }
+    
+    .error-message {
+        color: #dc3545;
+        font-size: 14px;
+        margin-top: 5px;
+    }
+    
+    .password-field {
+        position: relative;
+    }
+    
+    .password-toggle {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #6c757d;
+        font-size: 18px;
+    }
+    
+    .password-toggle:hover {
+        color: #495057;
+    }
+    
+    .form-check {
+        margin: 20px 0;
+    }
+    
+    .form-check-input {
+        margin-right: 10px;
+    }
+    
+    .form-check-label {
+        font-size: 14px;
+        color: #495057;
+    }
+    
+    .form-check-label a {
+        color: #007bff;
+        text-decoration: none;
+    }
+    
+    .form-check-label a:hover {
+        text-decoration: underline;
+    }
+    
+    .btn-primary {
+        width: 100%;
+        padding: 14px 20px;
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-bottom: 20px;
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 123, 255, 0.3);
+    }
+    
+    .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+    
+    .next-steps {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+    
+    .next-steps h4 {
+        margin: 0 0 15px 0;
+        color: #495057;
+        font-size: 16px;
+    }
+    
+    .next-steps ul {
+        margin: 0;
+        padding-left: 20px;
+        color: #6c757d;
+    }
+    
+    .next-steps li {
+        margin-bottom: 5px;
+    }
+    
+    .alert {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-size: 14px;
+    }
+    
+    .alert-success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .alert-error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .loading {
+        display: none;
+        margin-right: 8px;
+    }
+    
+    .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid #ffffff;
+        border-top: 2px solid transparent;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <!-- Auth Tabs -->
+        <div class="auth-tabs">
+            <div class="auth-tab" onclick="window.location.href='{% url 'accounts:signin' %}'">
+                Sign In
+            </div>
+            <div class="auth-tab active">
+                Sign Up
+            </div>
+        </div>
+        
+        <!-- Features -->
+        <div class="features">
+            <div class="feature-item">
+                <span class="feature-icon">📊</span>
+                Advanced analytics & insights
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">⚡</span>
+                Automated campaign management
+            </div>
+        </div>
+        
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <!-- Sign Up Form -->
+        <form method="post" id="signupForm">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <input type="text" 
+                       name="first_name" 
+                       class="form-control {% if form.first_name.errors %}error{% endif %}" 
+                       placeholder="John" 
+                       value="{{ form.first_name.value|default:'' }}"
+                       required>
+                {% if form.first_name.errors %}
+                    <div class="error-message">{{ form.first_name.errors.0 }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <input type="text" 
+                       name="last_name" 
+                       class="form-control {% if form.last_name.errors %}error{% endif %}" 
+                       placeholder="Doe" 
+                       value="{{ form.last_name.value|default:'' }}"
+                       required>
+                {% if form.last_name.errors %}
+                    <div class="error-message">{{ form.last_name.errors.0 }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <input type="text" 
+                       name="company_name" 
+                       class="form-control {% if form.company_name.errors %}error{% endif %}" 
+                       placeholder="Your Company" 
+                       value="{{ form.company_name.value|default:'' }}">
+                {% if form.company_name.errors %}
+                    <div class="error-message">{{ form.company_name.errors.0 }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <input type="email" 
+                       name="email" 
+                       class="form-control {% if form.email.errors %}error{% endif %}" 
+                       placeholder="your@email.com" 
+                       value="{{ form.email.value|default:'' }}"
+                       required>
+                {% if form.email.errors %}
+                    <div class="error-message">{{ form.email.errors.0 }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <input type="text" 
+                       name="username" 
+                       class="form-control {% if form.username.errors %}error{% endif %}" 
+                       placeholder="Choose a username" 
+                       value="{{ form.username.value|default:'' }}"
+                       required>
+                {% if form.username.errors %}
+                    <div class="error-message">{{ form.username.errors.0 }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <div class="password-field">
+                    <input type="password" 
+                           name="password1" 
+                           class="form-control {% if form.password1.errors %}error{% endif %}" 
+                           placeholder="Enter your password" 
+                           id="password1"
+                           required>
+                    <button type="button" class="password-toggle" onclick="togglePassword('password1')">
+                        👁️
+                    </button>
+                </div>
+                {% if form.password1.errors %}
+                    <div class="error-message">{{ form.password1.errors.0 }}</div>
+                {% else %}
+                    <div class="error-message">{{ form.password1.help_text }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <div class="password-field">
+                    <input type="password" 
+                           name="password2" 
+                           class="form-control {% if form.password2.errors %}error{% endif %}" 
+                           placeholder="Confirm your password" 
+                           id="password2"
+                           required>
+                    <button type="button" class="password-toggle" onclick="togglePassword('password2')">
+                        👁️
+                    </button>
+                </div>
+                {% if form.password2.errors %}
+                    <div class="error-message">{{ form.password2.errors.0 }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="terms" required>
+                <label class="form-check-label" for="terms">
+                    I agree to the <a href="#" onclick="alert('Terms of Service would go here')">Terms of Service</a> and <a href="#" onclick="alert('Privacy Policy would go here')">Privacy Policy</a>
+                </label>
+            </div>
+            
+            <button type="submit" class="btn-primary" id="submitBtn">
+                <span class="loading">
+                    <span class="spinner"></span>
+                </span>
+                Create Account
+            </button>
+        </form>
+        
+        <!-- Next Steps -->
+        <div class="next-steps">
+            <h4>What happens next?</h4>
+            <ul>
+                <li>Connect your Google Ads and Meta Ads</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePassword(fieldId) {
+    const field = document.getElementById(fieldId);
+    const toggle = field.nextElementSibling;
+    
+    if (field.type === 'password') {
+        field.type = 'text';
+        toggle.textContent = '🙈';
+    } else {
+        field.type = 'password';
+        toggle.textContent = '👁️';
+    }
+}
+
+document.getElementById('signupForm').addEventListener('submit', function(e) {
+    const submitBtn = document.getElementById('submitBtn');
+    const loading = submitBtn.querySelector('.loading');
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    loading.style.display = 'inline-block';
+    submitBtn.textContent = 'Creating Account...';
+});
+</script>
+{% endblock %}
