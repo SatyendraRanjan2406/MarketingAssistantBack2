@@ -50,5 +50,3 @@ urlpatterns += [
     path('api/sync-single-client/', views.sync_single_client_account, name='sync_single_client_account'),
     path('api/test-single-client-sync/', views.test_single_client_sync, name='test_single_client_sync'),
 ]
-
-]

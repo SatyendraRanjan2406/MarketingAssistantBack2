@@ -23,4 +23,3 @@ urlpatterns = [
     path('api/google-oauth/disconnect/', views.google_oauth_disconnect, name='google_oauth_disconnect'),
     path('api/google-oauth/ads-accounts/', views.google_ads_accounts, name='google_ads_accounts'),
 ]
-

@@ -256,5 +256,3 @@ class DataSyncLog(models.Model):
             summary_parts.append(f"Range: {self.results['date_range']}")
         
         return ", ".join(summary_parts) if summary_parts else "Sync completed"
-
-        return ", ".join(summary_parts) if summary_parts else "Sync completed"
