@@ -305,16 +305,9 @@ class UserGoogleAuthService:
     """Service class for managing UserGoogleAuth model"""
     
     @staticmethod
-    def create_or_update_auth(
-        user,
-        access_token: str,
-        refresh_token: str,
-        token_expiry: datetime,
-        scopes: str,
-        user_info: Dict[str, Any]
-    ) -> UserGoogleAuth:
+    def create_or_update_auth(user, access_token, refresh_token, token_expiry, scopes, user_info) -> UserGoogleAuth:
         """
-        Create or update UserGoogleAuth record
+        Create or update Google OAuth authentication record
         
         Args:
             user: Django User instance
@@ -328,15 +321,15 @@ class UserGoogleAuthService:
             UserGoogleAuth instance
         """
         try:
-            # Try to get existing auth record
+            # Try to get existing auth record for this user and Google account
             auth_record, created = UserGoogleAuth.objects.get_or_create(
                 user=user,
+                google_user_id=user_info['google_user_id'],  # Include google_user_id in lookup
                 defaults={
                     'access_token': access_token,
                     'refresh_token': refresh_token,
                     'token_expiry': token_expiry,
                     'scopes': scopes,
-                    'google_user_id': user_info['google_user_id'],
                     'google_email': user_info['google_email'],
                     'google_name': user_info['google_name'],
                     'is_active': True,
@@ -351,7 +344,6 @@ class UserGoogleAuthService:
                 auth_record.refresh_token = refresh_token
                 auth_record.token_expiry = token_expiry
                 auth_record.scopes = scopes
-                auth_record.google_user_id = user_info['google_user_id']
                 auth_record.google_email = user_info['google_email']
                 auth_record.google_name = user_info['google_name']
                 auth_record.is_active = True

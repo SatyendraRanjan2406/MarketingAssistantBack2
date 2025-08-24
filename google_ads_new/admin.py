@@ -3,7 +3,8 @@ from django.utils.html import format_html
 from django.db.models import Sum, Avg, Count
 from .models import (
     GoogleAdsAccount, GoogleAdsCampaign, GoogleAdsAdGroup,
-    GoogleAdsKeyword, GoogleAdsPerformance, DataSyncLog
+    GoogleAdsKeyword, GoogleAdsPerformance, DataSyncLog,
+    ChatSession, ChatMessage, KBDocument, UserIntent, AIToolExecution
 )
 
 
@@ -257,3 +258,155 @@ class DataSyncLogAdmin(admin.ModelAdmin):
 admin.site.site_header = "Google Ads Marketing Assistant Admin"
 admin.site.site_title = "Google Ads Admin"
 admin.site.index_title = "Welcome to Google Ads Marketing Assistant"
+
+# Chat and AI Assistant Admin
+@admin.register(ChatSession)
+class ChatSessionAdmin(admin.ModelAdmin):
+    """Admin interface for chat sessions"""
+    list_display = ['id', 'user', 'title', 'created_at', 'updated_at', 'message_count']
+    list_filter = ['created_at', 'updated_at']
+    search_fields = ['user__username', 'user__email', 'title']
+    readonly_fields = ['id', 'created_at', 'updated_at']
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Session Information', {
+            'fields': ('id', 'user', 'title')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def message_count(self, obj):
+        """Display count of messages in session"""
+        return obj.messages.count()
+    
+    message_count.short_description = 'Messages'
+
+
+@admin.register(ChatMessage)
+class ChatMessageAdmin(admin.ModelAdmin):
+    """Admin interface for chat messages"""
+    list_display = ['id', 'session', 'role', 'content_preview', 'created_at']
+    list_filter = ['role', 'created_at', 'session__user']
+    search_fields = ['content', 'session__user__username', 'session__title']
+    readonly_fields = ['id', 'created_at']
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Message Information', {
+            'fields': ('id', 'session', 'role', 'content')
+        }),
+        ('Metadata', {
+            'fields': ('metadata',),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def content_preview(self, obj):
+        """Display preview of message content"""
+        return obj.content[:100] + "..." if len(obj.content) > 100 else obj.content
+    
+    content_preview.short_description = 'Content Preview'
+
+
+@admin.register(KBDocument)
+class KBDocumentAdmin(admin.ModelAdmin):
+    """Admin interface for knowledge base documents"""
+    list_display = ['id', 'title', 'company_id', 'document_type', 'created_at', 'updated_at']
+    list_filter = ['document_type', 'company_id', 'created_at']
+    search_fields = ['title', 'content', 'url']
+    readonly_fields = ['id', 'created_at', 'updated_at']
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Document Information', {
+            'fields': ('id', 'company_id', 'title', 'content', 'url', 'document_type')
+        }),
+        ('Embedding', {
+            'fields': ('embedding',),
+            'classes': ('collapse',),
+            'description': 'Vector embedding for similarity search'
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(UserIntent)
+class UserIntentAdmin(admin.ModelAdmin):
+    """Admin interface for user intent patterns"""
+    list_display = ['id', 'user', 'detected_intent', 'intent_confidence', 'created_at']
+    list_filter = ['detected_intent', 'intent_confidence', 'created_at']
+    search_fields = ['user__username', 'user_query', 'detected_intent']
+    readonly_fields = ['id', 'created_at']
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Intent Information', {
+            'fields': ('id', 'user', 'user_query', 'detected_intent', 'intent_confidence')
+        }),
+        ('Tool Calls', {
+            'fields': ('tool_calls',),
+            'classes': ('collapse',)
+        }),
+        ('Response Blocks', {
+            'fields': ('response_blocks',),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(AIToolExecution)
+class AIToolExecutionAdmin(admin.ModelAdmin):
+    """Admin interface for AI tool executions"""
+    list_display = [
+        'id', 'user', 'tool_type', 'tool_name', 'success', 
+        'execution_time_ms', 'created_at'
+    ]
+    list_filter = ['tool_type', 'success', 'created_at']
+    search_fields = ['user__username', 'tool_name', 'tool_type']
+    readonly_fields = ['id', 'created_at']
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Execution Information', {
+            'fields': ('id', 'user', 'session', 'tool_type', 'tool_name')
+        }),
+        ('Parameters', {
+            'fields': ('input_parameters',),
+            'classes': ('collapse',)
+        }),
+        ('Results', {
+            'fields': ('output_result', 'success', 'error_message'),
+            'classes': ('collapse',)
+        }),
+        ('Performance', {
+            'fields': ('execution_time_ms',),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def execution_time_display(self, obj):
+        """Display execution time in human-readable format"""
+        if obj.execution_time_ms:
+            return f"{obj.execution_time_ms}ms"
+        return "N/A"
+    
+    execution_time_display.short_description = 'Execution Time'

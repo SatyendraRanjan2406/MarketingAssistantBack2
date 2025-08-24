@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from decimal import Decimal
+import uuid
 
 
 class GoogleAdsAccount(models.Model):
@@ -256,3 +257,136 @@ class DataSyncLog(models.Model):
             summary_parts.append(f"Range: {self.results['date_range']}")
         
         return ", ".join(summary_parts) if summary_parts else "Sync completed"
+
+
+# Chat and AI Assistant Models
+class ChatSession(models.Model):
+    """Chat conversation sessions for AI assistant"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_sessions')
+    title = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'chat_sessions'
+        verbose_name = 'Chat Session'
+        verbose_name_plural = 'Chat Sessions'
+        ordering = ['-updated_at']
+    
+    def __str__(self):
+        return f"Chat Session {self.id} - {self.user.username}"
+
+
+class ChatMessage(models.Model):
+    """Individual chat messages with memory"""
+    ROLE_CHOICES = [
+        ('user', 'User'),
+        ('assistant', 'Assistant'),
+        ('system', 'System'),
+        ('tool', 'Tool'),
+    ]
+    
+    session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name='messages')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    content = models.TextField()
+    metadata = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'chat_messages'
+        verbose_name = 'Chat Message'
+        verbose_name_plural = 'Chat Messages'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['session', 'created_at']),
+            models.Index(fields=['role', 'created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.role} message in {self.session.id}"
+
+
+class KBDocument(models.Model):
+    """Company knowledge base documents for RAG"""
+    company_id = models.BigIntegerField(default=1)
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    url = models.URLField(blank=True, null=True)
+    document_type = models.CharField(max_length=50, default='general')
+    embedding = models.BinaryField(blank=True, null=True)  # Store as binary for vector similarity
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'kb_documents'
+        verbose_name = 'Knowledge Base Document'
+        verbose_name_plural = 'Knowledge Base Documents'
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['company_id']),
+            models.Index(fields=['document_type']),
+        ]
+    
+    def __str__(self):
+        return f"{self.title} ({self.document_type})"
+
+
+class UserIntent(models.Model):
+    """User intent patterns for fine-tuning and analytics"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_intents')
+    user_query = models.TextField()
+    detected_intent = models.CharField(max_length=100)
+    intent_confidence = models.FloatField(null=True, blank=True)
+    tool_calls = models.JSONField(default=dict)
+    response_blocks = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'user_intents'
+        verbose_name = 'User Intent'
+        verbose_name_plural = 'User Intents'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'created_at']),
+            models.Index(fields=['detected_intent']),
+        ]
+    
+    def __str__(self):
+        return f"{self.detected_intent} - {self.user.username}"
+
+
+class AIToolExecution(models.Model):
+    """Track AI tool executions for auditing and improvement"""
+    TOOL_TYPE_CHOICES = [
+        ('google_ads', 'Google Ads API'),
+        ('database', 'Database Query'),
+        ('knowledge_base', 'Knowledge Base Search'),
+        ('analytics', 'Analytics Generation'),
+        ('campaign_management', 'Campaign Management'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ai_tool_executions')
+    session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name='tool_executions')
+    tool_type = models.CharField(max_length=30, choices=TOOL_TYPE_CHOICES)
+    tool_name = models.CharField(max_length=100)
+    input_parameters = models.JSONField(default=dict)
+    output_result = models.JSONField(default=dict)
+    execution_time_ms = models.IntegerField(null=True, blank=True)
+    success = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'ai_tool_executions'
+        verbose_name = 'AI Tool Execution'
+        verbose_name_plural = 'AI Tool Executions'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'created_at']),
+            models.Index(fields=['tool_type', 'success']),
+            models.Index(fields=['session', 'created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.tool_name} - {self.user.username} ({'Success' if self.success else 'Failed'})"
