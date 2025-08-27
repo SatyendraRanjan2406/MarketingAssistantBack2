@@ -1,17 +1,39 @@
-# Environment variables
+# Environment variables and sensitive files
 .env
+.env.*
 .env.local
 .env.production
-.venv/
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-venv
-.lh/
-.history/
-.__pycache__
+.env.development
+.env.test
+.env.staging
+.env.backup*
+.env.bak*
+
+# API Credentials and Tokens
+*credentials*.json
+*token*.json
+*secret*.json
+*key*.json
+*api*.json
+*config*.json
+*.pem
+*.key
+*.crt
+*.p12
+
+# Google Ads specific
+google_ads_credentials*.json
+google_ads_token*.json
+google-ads*.yaml
+google-ads*.yml
+
+# Backup files
+*.backup
+*.bak
+*.old
+*.tmp
+*.temp
+
 # Python
 __pycache__/
 *.py[cod]
@@ -59,7 +81,6 @@ venv.bak/
 /Users/satyendra/marketing_assistant/env.bak/
 /Users/satyendra/marketing_assistant/venv.bak/
 
-
 # IDE
 .vscode/
 .idea/
@@ -79,7 +100,12 @@ Thumbs.db
 # History files
 .history/
 .lh/
-
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+    
 # Celery
 celerybeat-schedule
 celerybeat.pid
