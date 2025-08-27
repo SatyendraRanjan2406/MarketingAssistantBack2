@@ -1,13 +1,13 @@
-# # Environment variables and sensitive files
-# .env
-# .env.*
-# .env.local
-# .env.production
-# .env.development
-# .env.test
-# .env.staging
-# .env.backup*
-# .env.bak*
+# Environment variables and sensitive files
+.env
+.env.*
+.env.local
+.env.production
+.env.development
+.env.test
+.env.staging
+.env.backup*
+.env.bak*
 
 # API Credentials and Tokens
 *credentials*.json

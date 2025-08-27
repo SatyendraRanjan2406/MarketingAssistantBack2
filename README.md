@@ -69,7 +69,7 @@ python demo_rag_system.py   # Demo all RAG capabilities
 Update the token in `App.tsx`:
 
 ```typescript
-const token = 'your-actual-jwt-token-here';
+const token = process.env.REACT_APP_AUTH_TOKEN || '';
 ```
 
 ### 5. Start the Development Server
@@ -177,7 +177,7 @@ Create a `.env` file for production settings:
 
 ```env
 REACT_APP_API_BASE_URL=https://your-api-domain.com
-REACT_APP_AUTH_TOKEN=your-production-token
+REACT_APP_AUTH_TOKEN=
 ```
 
 ## 🤝 Contributing

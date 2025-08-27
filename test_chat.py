@@ -43,10 +43,10 @@ def test_chat_service():
     
     # Test chat service initialization
     try:
-        # Use a dummy API key for testing
+        # Use environment API key for testing
         chat_service = GoogleAdsChatService(
             user_id=1,  # Assuming user ID 1 exists
-            openai_api_key="test_key"
+            openai_api_key=os.getenv('OPENAI_API_KEY', '')
         )
         print("✅ Chat service initialized successfully")
         

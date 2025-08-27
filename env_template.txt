@@ -1,16 +1,16 @@
 # OpenAI Configuration
 # Copy this file to .env and fill in your actual values
-OPENAI_API_KEY=sk-your-actual-openai-api-key-here
+OPENAI_API_KEY=
 
 # Google Ads Configuration
-GOOGLE_ADS_CLIENT_ID=your-google-ads-client-id
-GOOGLE_ADS_CLIENT_SECRET=your-google-ads-client-secret
-GOOGLE_ADS_DEVELOPER_TOKEN=your-google-ads-developer-token
-GOOGLE_ADS_REFRESH_TOKEN=your-google-ads-refresh-token
-GOOGLE_ADS_LOGIN_CUSTOMER_ID=your-google-ads-login-customer-id
+GOOGLE_ADS_CLIENT_ID=
+GOOGLE_ADS_CLIENT_SECRET=
+GOOGLE_ADS_DEVELOPER_TOKEN=
+GOOGLE_ADS_REFRESH_TOKEN=
+GOOGLE_ADS_LOGIN_CUSTOMER_ID=
 
 # Django Configuration
-SECRET_KEY=your-django-secret-key-here
+SECRET_KEY=
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 

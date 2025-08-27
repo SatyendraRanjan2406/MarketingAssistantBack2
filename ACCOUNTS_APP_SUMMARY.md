@@ -151,7 +151,7 @@ python manage.py shell -c "user = form.save(); print('User created:', user.usern
 
 ### **Admin Interface**
 - **Admin**: `http://localhost:8000/admin/`
-- **Credentials**: `admin2` / `admin123`
+- **Credentials**: Set up through Django admin or environment variables
 
 ## 🔗 Integration Status
 

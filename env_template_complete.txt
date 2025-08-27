@@ -1,5 +1,5 @@
 # Django Settings
-SECRET_KEY=your_django_secret_key_here
+SECRET_KEY=
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 
@@ -8,19 +8,19 @@ DATABASE_URL=postgresql://username:password@localhost:5432/marketing_assistant
 
 # Google OAuth Configuration
 # Get these from Google Cloud Console: https://console.cloud.google.com/
-GOOGLE_OAUTH_CLIENT_ID=your_google_oauth_client_id_here
-GOOGLE_OAUTH_CLIENT_SECRET=your_google_oauth_client_secret_here
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
 GOOGLE_OAUTH_REDIRECT_URI=http://localhost:5173/google-oauth/callback/
 
 # Google Ads Configuration
-GOOGLE_ADS_DEVELOPER_TOKEN=your_developer_token_here
-GOOGLE_ADS_CLIENT_ID=your_google_ads_client_id_here
-GOOGLE_ADS_CLIENT_SECRET=your_google_ads_client_secret_here
-GOOGLE_ADS_REFRESH_TOKEN=your_google_ads_refresh_token_here
-GOOGLE_ADS_LOGIN_CUSTOMER_ID=your_google_ads_login_customer_id_here
+GOOGLE_ADS_DEVELOPER_TOKEN=
+GOOGLE_ADS_CLIENT_ID=
+GOOGLE_ADS_CLIENT_SECRET=
+GOOGLE_ADS_REFRESH_TOKEN=
+GOOGLE_ADS_LOGIN_CUSTOMER_ID=
 
 # Redis (for Celery)
 REDIS_URL=redis://localhost:6379/0
 
 # JWT Settings
-JWT_SECRET_KEY=your_jwt_secret_key_here
+JWT_SECRET_KEY=

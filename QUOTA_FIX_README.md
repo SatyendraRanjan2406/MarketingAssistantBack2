@@ -27,14 +27,14 @@ This will guide you through setting up your `.env` file interactively.
 
 #### Option B: Manual Setup
 1. Edit the `.env` file in your project root
-2. Replace `your_openai_api_key_here` with your actual API key:
+2. Replace the empty value with your actual API key:
    ```bash
-   OPENAI_API_KEY=sk-your-actual-api-key-here
+   OPENAI_API_KEY=your_actual_key_here
    ```
 
 #### Option C: Export Environment Variable
 ```bash
-export OPENAI_API_KEY="sk-your-actual-api-key-here"
+export OPENAI_API_KEY="your_actual_key_here"
 ```
 
 ### Step 3: Restart Your Django Server

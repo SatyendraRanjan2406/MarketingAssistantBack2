@@ -25,12 +25,12 @@ def setup_openai():
                 print("✅ OPENAI_API_KEY is configured in .env")
                 
                 # Check if it's not the default value
-                if 'sk-your-actual-openai-api-key-here' in content:
-                    print("⚠️  Warning: OPENAI_API_KEY still has default value")
-                    print("   Please update it with your actual API key")
-                else:
+                if 'sk-' in content and len(content.strip()) > 10:
                     print("✅ OPENAI_API_KEY appears to be configured")
                     return True
+                else:
+                    print("⚠️  Warning: OPENAI_API_KEY not properly configured")
+                    print("   Please update it with your actual API key")
             else:
                 print("❌ OPENAI_API_KEY not found in .env")
     else:
@@ -64,7 +64,7 @@ def setup_openai():
     else:
         print(f"❌ Template file {template_file} not found")
         print("📝 Please create .env manually with:")
-        print("   OPENAI_API_KEY=sk-your-actual-api-key-here")
+        print("   OPENAI_API_KEY=your_actual_key_here")
         return False
 
 def verify_setup():

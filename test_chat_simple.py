@@ -36,9 +36,9 @@ def test_chat_service():
         response = chat_service.chat("Hello")
         print(f"   ✅ Chat response: {response}")
         
-        # Test with dummy API key
-        print("\n2. Testing with dummy API key...")
-        chat_service_with_key = GoogleAdsChatService(user_id=1, openai_api_key="dummy_key")
+        # Test with environment API key
+        print("\n2. Testing with environment API key...")
+        chat_service_with_key = GoogleAdsChatService(user_id=1, openai_api_key=os.getenv('OPENAI_API_KEY', ''))
         
         # This should fail gracefully
         try:

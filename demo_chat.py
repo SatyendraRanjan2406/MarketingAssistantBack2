@@ -127,7 +127,7 @@ def demo_chart_generation():
         
         chat_service = GoogleAdsChatService(
             user_id=1,
-            openai_api_key="demo_key"
+            openai_api_key=os.getenv('OPENAI_API_KEY', '')
         )
         
         # Test different chart types

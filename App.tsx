@@ -2,8 +2,8 @@ import React from 'react';
 import AIChatBox from './components/AIChatBox';
 
 function App() {
-  // Replace this with your actual JWT token
-  const token = 'your-jwt-token-here';
+  // Get token from environment variable or authentication context
+  const token = process.env.REACT_APP_AUTH_TOKEN || '';
 
   return (
     <div className="min-h-screen bg-gray-50">

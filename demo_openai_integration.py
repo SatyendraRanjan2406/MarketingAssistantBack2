@@ -42,7 +42,7 @@ def demo_openai_integration():
         except ValueError as e:
             print(f"❌ OpenAI service initialization failed: {e}")
             print("💡 Please set your OPENAI_API_KEY in the .env file")
-            print("   Example: OPENAI_API_KEY=sk-your-actual-api-key-here")
+            print("   Example: OPENAI_API_KEY=your_actual_key_here")
             return
         
         data_service = GoogleAdsDataService(user)
@@ -147,7 +147,7 @@ def demo_openai_integration():
         print("\n🔧 Setup Instructions:")
         print("   1. Get OpenAI API key from https://platform.openai.com/api-keys")
         print("   2. Create .env file: cp env_template.txt .env")
-        print("   3. Edit .env with your API key: OPENAI_API_KEY=sk-your-key")
+        print("   3. Edit .env with your API key: OPENAI_API_KEY=your_actual_key")
         print("   4. Install requirements: pip install -r requirements.txt")
         
         print("\n📱 Frontend Integration:")

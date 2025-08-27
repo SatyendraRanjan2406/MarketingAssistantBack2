@@ -72,21 +72,21 @@ DB_HOST={db_host}
 DB_PORT={db_port}
 
 # OpenAI API Configuration
-OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_API_KEY=
 
 # Google Ads API Configuration
-GOOGLE_ADS_CLIENT_ID=your_google_ads_client_id
-GOOGLE_ADS_CLIENT_SECRET=your_google_ads_client_secret
-GOOGLE_ADS_DEVELOPER_TOKEN=your_developer_token
-GOOGLE_ADS_REFRESH_TOKEN=your_refresh_token
-GOOGLE_ADS_LOGIN_CUSTOMER_ID=your_login_customer_id
+GOOGLE_ADS_CLIENT_ID=
+GOOGLE_ADS_CLIENT_SECRET=
+GOOGLE_ADS_DEVELOPER_TOKEN=
+GOOGLE_ADS_REFRESH_TOKEN=
+GOOGLE_ADS_LOGIN_CUSTOMER_ID=
 
 # Redis Configuration (for Celery)
 REDIS_URL=redis://localhost:6379/0
 
 # Django Configuration
 DEBUG=True
-SECRET_KEY=your_django_secret_key_here
+SECRET_KEY=
 ALLOWED_HOSTS=localhost,127.0.0.1
 """
     

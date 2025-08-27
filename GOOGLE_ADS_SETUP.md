@@ -66,15 +66,14 @@ Add these to your `.env` file:
 
 ```env
 # Google Ads API Credentials
-GOOGLE_ADS_CLIENT_ID=your_client_id_here
-GOOGLE_ADS_CLIENT_SECRET=your_client_secret_here
-GOOGLE_ADS_DEVELOPER_TOKEN=your_developer_token_here
-GOOGLE_ADS_REFRESH_TOKEN=your_refresh_token_here
-GOOGLE_ADS_CUSTOMER_ID=your_customer_id_here
+GOOGLE_ADS_CLIENT_ID=
+GOOGLE_ADS_CLIENT_SECRET=
+GOOGLE_ADS_DEVELOPER_TOKEN=
+GOOGLE_ADS_REFRESH_TOKEN=
+GOOGLE_ADS_CUSTOMER_ID=
 
 # Optional: Login Customer ID (for MCC accounts)
-GOOGLE_ADS_LOGIN_CUSTOMER_ID=your_mcc_customer_id_here
-```
+GOOGLE_ADS_LOGIN_CUSTOMER_ID=
 
 ## 🔧 Troubleshooting
 

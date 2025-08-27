@@ -265,7 +265,7 @@ All sync operations are logged with:
 # Database
 DB_NAME=marketing_assistant_db
 DB_USER=satyendra
-DB_PASSWORD=your_password
+DB_PASSWORD=
 DB_HOST=localhost
 DB_PORT=5432
 
@@ -273,10 +273,10 @@ DB_PORT=5432
 REDIS_URL=redis://localhost:6379/0
 
 # Google Ads API
-GOOGLE_ADS_CLIENT_ID=your_client_id
-GOOGLE_ADS_CLIENT_SECRET=your_client_secret
-GOOGLE_ADS_DEVELOPER_TOKEN=your_token
-GOOGLE_ADS_REFRESH_TOKEN=your_refresh_token
+GOOGLE_ADS_CLIENT_ID=
+GOOGLE_ADS_CLIENT_SECRET=
+GOOGLE_ADS_DEVELOPER_TOKEN=
+GOOGLE_ADS_REFRESH_TOKEN=
 ```
 
 ### Django Settings

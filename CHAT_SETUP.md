@@ -22,14 +22,14 @@ Create a `.env` file in your project root with the following variables:
 
 ```bash
 # Google Ads API Configuration
-GOOGLE_DEV_TOKEN=your_google_ads_developer_token
-GOOGLE_ADS_CLIENT_ID=your_google_ads_client_id
-GOOGLE_ADS_CLIENT_SECRET=your_google_ads_client_secret
-GOOGLE_ADS_REFRESH_TOKEN=your_google_ads_refresh_token
-GOOGLE_ADS_LOGIN_CUSTOMER_ID=your_google_ads_login_customer_id
+GOOGLE_DEV_TOKEN=
+GOOGLE_ADS_CLIENT_ID=
+GOOGLE_ADS_CLIENT_SECRET=
+GOOGLE_ADS_REFRESH_TOKEN=
+GOOGLE_ADS_LOGIN_CUSTOMER_ID=
 
 # OpenAI API Configuration for Chat Assistant
-OPENAI_API_KEY=your_openai_api_key
+OPENAI_API_KEY=
 
 # Redis Configuration (optional, for Celery)
 REDIS_URL=redis://localhost:6379/0
