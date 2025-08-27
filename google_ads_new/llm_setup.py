@@ -70,7 +70,8 @@ class Intent(BaseModel):
         "GET_ADGROUPS", "GET_ADS", "CREATE_ADGROUP", "CREATE_AD",
         "SEARCH_KB", "SEARCH_DB", "GET_ANALYTICS", "GET_BUDGETS",
         "PAUSE_CAMPAIGN", "RESUME_CAMPAIGN", "DELETE_CAMPAIGN",
-        "GET_PERFORMANCE", "GET_KEYWORDS", "ADD_KB_DOCUMENT"
+        "GET_PERFORMANCE", "GET_KEYWORDS", "ADD_KB_DOCUMENT",
+        "GENERATE_IMAGES", "CREATE_DYNAMIC_AD", "GET_CREATIVE_SUGGESTIONS"
     ]
     confidence: float = Field(ge=0.0, le=1.0)
     parameters: Dict[str, Any] = Field(default_factory=dict)
@@ -110,7 +111,10 @@ class LLMSetup:
         - GET_ADGROUPS: Get ad group information
         - GET_ADS: Get ad information
         - CREATE_ADGROUP: Create new ad groups
-        - CREATE_AD: Create new ads
+        - CREATE_AD: Create new ads (including with images)
+        - GENERATE_IMAGES: Generate AI images for products using DALL-E
+        - CREATE_DYNAMIC_AD: Create ads with AI-generated creative suggestions
+        - GET_CREATIVE_SUGGESTIONS: Get AI-powered creative suggestions for ads
         - SEARCH_KB: Search company knowledge base
         - SEARCH_DB: Search local database
         - GET_ANALYTICS: Get performance analytics
@@ -121,6 +125,12 @@ class LLMSetup:
         - GET_PERFORMANCE: Get performance data
         - GET_KEYWORDS: Get keyword information
         - ADD_KB_DOCUMENT: Add document to knowledge base
+        
+        IMPORTANT: 
+        - If user mentions "images", "photos", "pictures", "visuals" → use GENERATE_IMAGES
+        - If user mentions "creative", "suggestions", "ideas" → use GET_CREATIVE_SUGGESTIONS
+        - If user mentions "create ad" with images → use CREATE_AD
+        - If user mentions "share images" → use GENERATE_IMAGES
         
         Return a JSON object with:
         - action: the detected action
@@ -230,7 +240,18 @@ class LLMSetup:
                     items=[
                         {"id": "refresh_data", "label": "Refresh Data"},
                         {"id": "create_campaign", "label": "Create Campaign"},
-                        {"id": "view_analytics", "label": "View Analytics"}
+                        {"id": "view_analytics", "label": "View Analytics"},
+                        {"id": "create_ad", "label": "Create Ad"},
+                        {"id": "create_adgroup", "label": "Create Ad Group"},
+                        {"id": "get_campaigns", "label": "View Campaigns"},
+                        {"id": "get_ads", "label": "View Ads"},
+                        {"id": "get_creative_suggestions", "label": "Get Creative Ideas"},
+                        {"id": "generate_images", "label": "Generate Images"},
+                        {"id": "optimize_campaign", "label": "Optimize Campaign"},
+                        {"id": "set_budget", "label": "Set Budget"},
+                        {"id": "get_performance", "label": "View Performance"},
+                        {"id": "retry_action", "label": "Retry Action"},
+                        {"id": "contact_support", "label": "Contact Support"}
                     ]
                 ))
                 

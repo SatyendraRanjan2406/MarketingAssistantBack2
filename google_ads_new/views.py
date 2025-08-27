@@ -1165,7 +1165,7 @@ def account_summary_view(request):
         # Count active campaigns
         active_campaigns = GoogleAdsCampaign.objects.filter(
             account__in=user_accounts,
-            status='ENABLED'
+            campaign_status='ENABLED'
         ).count()
         
         # Get monthly spend

@@ -218,14 +218,69 @@ class ChatService:
                 ga_tools = GoogleAdsTools(self.user, str(self.session.id) if self.session else None)
                 
                 if "name" in intent.parameters and "budget_amount_micros" in intent.parameters:
-                    results["campaign_creation"] = ga_tools.create_campaign(
-                        name=intent.parameters["name"],
-                        budget_amount_micros=intent.parameters["budget_amount_micros"],
-                        channel_type=intent.parameters.get("channel_type", "SEARCH"),
-                        status=intent.parameters.get("status", "PAUSED")
-                    )
+                    # User provided campaign details, create the campaign
+                    try:
+                        results["campaign_creation"] = ga_tools.create_campaign(
+                            name=intent.parameters["name"],
+                            budget_amount_micros=intent.parameters["budget_amount_micros"],
+                            channel_type=intent.parameters.get("channel_type", "SEARCH"),
+                            status=intent.parameters.get("status", "PAUSED")
+                        )
+                        results["success_message"] = f"Campaign '{intent.parameters['name']}' created successfully!"
+                    except Exception as e:
+                        results["error"] = f"Failed to create campaign: {str(e)}"
                 else:
-                    results["error"] = "Missing required parameters for campaign creation"
+                    # User wants to create a campaign but hasn't provided details yet
+                    # Show campaign creation form
+                    results["show_campaign_form"] = True
+                    results["campaign_form"] = {
+                        "title": "Create New Campaign",
+                        "description": "Please provide the following details to create your campaign:",
+                        "fields": [
+                            {
+                                "name": "name",
+                                "label": "Campaign Name",
+                                "type": "text",
+                                "required": True,
+                                "placeholder": "e.g., Summer Sale Campaign"
+                            },
+                            {
+                                "name": "budget_amount_micros",
+                                "label": "Daily Budget (USD)",
+                                "type": "number",
+                                "required": True,
+                                "placeholder": "25.00",
+                                "step": "0.01",
+                                "min": "0.01"
+                            },
+                            {
+                                "name": "channel_type",
+                                "label": "Campaign Type",
+                                "type": "select",
+                                "required": False,
+                                "options": [
+                                    {"value": "SEARCH", "label": "Search"},
+                                    {"value": "DISPLAY", "label": "Display"},
+                                    {"value": "VIDEO", "label": "Video"},
+                                    {"value": "SHOPPING", "label": "Shopping"},
+                                    {"value": "PERFORMANCE_MAX", "label": "Performance Max"}
+                                ],
+                                "default": "SEARCH"
+                            },
+                            {
+                                "name": "status",
+                                "label": "Initial Status",
+                                "type": "select",
+                                "required": False,
+                                "options": [
+                                    {"value": "PAUSED", "label": "Paused (Recommended)"},
+                                    {"value": "ENABLED", "label": "Enabled"}
+                                ],
+                                "default": "PAUSED"
+                            }
+                        ]
+                    }
+                    results["message"] = "I'll help you create a new campaign. Please fill out the form below with your campaign details."
                     
             elif intent.action == "SEARCH_KB":
                 # Search knowledge base
@@ -317,9 +372,510 @@ class ChatService:
                     )
                 else:
                     results["error"] = "Missing required parameters for document creation"
+            
+            # New comprehensive analysis actions
+            elif intent.action == "ANALYZE_AUDIENCE":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["audience_analysis"] = analysis_service.analyze_audience(account_id)
+                
+            elif intent.action == "CHECK_CREATIVE_FATIGUE":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["creative_fatigue_analysis"] = analysis_service.check_creative_fatigue(account_id)
+                
+            elif intent.action == "ANALYZE_VIDEO_PERFORMANCE":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["video_performance_analysis"] = analysis_service.analyze_video_performance(account_id)
+                
+            elif intent.action == "COMPARE_PERFORMANCE":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                comparison_type = intent.parameters.get("comparison_type", "M1_M2")
+                account_id = intent.parameters.get("account_id")
+                results["performance_comparison"] = analysis_service.compare_performance(comparison_type, account_id)
+                
+            elif intent.action == "OPTIMIZE_CAMPAIGN":
+                # Use RAG system for optimization queries
+                from .rag_service import GoogleAdsRAGService
+                from .data_service import GoogleAdsDataService
+                
+                # Get user's Google Ads data for context
+                data_service = GoogleAdsDataService(self.user)
+                account_data = data_service.get_campaign_data()
+                
+                # Initialize RAG service
+                rag_service = GoogleAdsRAGService(self.user)
+                
+                # Get hybrid response using smart context selection
+                rag_response = rag_service.get_hybrid_response("how to optimize Google Ads campaigns", account_data)
+                
+                # Store the RAG-enhanced response
+                results["rag_enhanced_response"] = rag_response
+                results["response_type"] = rag_response.get("response_type", "unknown")
+                results["rag_metadata"] = rag_response.get("rag_metadata", {})
+                
+            elif intent.action == "OPTIMIZE_ADSET":
+                # Use RAG system for ad set optimization queries
+                from .rag_service import GoogleAdsRAGService
+                from .data_service import GoogleAdsDataService
+                
+                # Get user's Google Ads data for context
+                data_service = GoogleAdsDataService(self.user)
+                account_data = data_service.get_campaign_data()
+                
+                # Initialize RAG service
+                rag_service = GoogleAdsRAGService(self.user)
+                
+                # Get hybrid response using smart context selection
+                rag_response = rag_service.get_hybrid_response("how to optimize Google Ads ad sets", account_data)
+                
+                # Store the RAG-enhanced response
+                results["rag_enhanced_response"] = rag_response
+                results["response_type"] = rag_response.get("response_type", "unknown")
+                results["rag_metadata"] = rag_response.get("rag_metadata", {})
+                
+            elif intent.action == "OPTIMIZE_AD":
+                # Use RAG system for ad optimization queries
+                from .rag_service import GoogleAdsRAGService
+                from .data_service import GoogleAdsDataService
+                
+                # Get user's Google Ads data for context
+                data_service = GoogleAdsDataService(self.user)
+                account_data = data_service.get_campaign_data()
+                
+                # Initialize RAG service
+                rag_service = GoogleAdsRAGService(self.user)
+                
+                # Get hybrid response using smart context selection
+                rag_response = rag_service.get_hybrid_response("how to optimize Google Ads ads", account_data)
+                
+                # Store the RAG-enhanced response
+                results["rag_enhanced_response"] = rag_response
+                results["response_type"] = rag_response.get("response_type", "unknown")
+                results["rag_metadata"] = rag_response.get("rag_metadata", {})
+                
+            elif intent.action == "ANALYZE_PLACEMENTS":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["placement_analysis"] = analysis_service.analyze_placements(account_id)
+                
+            elif intent.action == "ANALYZE_DEVICE_PERFORMANCE":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["device_performance_analysis"] = analysis_service.analyze_device_performance(account_id)
+                
+            elif intent.action == "ANALYZE_TIME_PERFORMANCE":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["time_performance_analysis"] = analysis_service.analyze_time_performance(account_id)
+                
+            elif intent.action == "ANALYZE_DEMOGRAPHICS":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["demographic_analysis"] = analysis_service.analyze_demographics(account_id)
+                
+            elif intent.action == "ANALYZE_COMPETITORS":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["competitor_analysis"] = analysis_service.analyze_competitors(account_id)
+                
+            elif intent.action == "TEST_CREATIVE_ELEMENTS":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["creative_testing"] = analysis_service.test_creative_elements(account_id)
+                
+            elif intent.action == "CHECK_TECHNICAL_COMPLIANCE":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["technical_compliance"] = analysis_service.check_technical_compliance(account_id)
+                
+            elif intent.action == "ANALYZE_AUDIENCE_INSIGHTS":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["audience_insights"] = analysis_service.analyze_audience_insights(account_id)
+                
+            elif intent.action == "OPTIMIZE_BUDGETS":
+                # Use RAG system for budget optimization queries
+                from .rag_service import GoogleAdsRAGService
+                from .data_service import GoogleAdsDataService
+                
+                # Get user's Google Ads data for context
+                data_service = GoogleAdsDataService(self.user)
+                account_data = data_service.get_campaign_data()
+                
+                # Initialize RAG service
+                rag_service = GoogleAdsRAGService(self.user)
+                
+                # Get hybrid response using smart context selection
+                rag_response = rag_service.get_hybrid_response("how to optimize Google Ads budgets", account_data)
+                
+                # Store the RAG-enhanced response
+                results["rag_enhanced_response"] = rag_response
+                results["response_type"] = rag_response.get("response_type", "unknown")
+                results["rag_metadata"] = rag_response.get("rag_metadata", {})
+            
+            # Additional Google Ads analysis actions
+            elif intent.action == "CHECK_CAMPAIGN_CONSISTENCY":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["campaign_consistency_analysis"] = analysis_service.check_campaign_consistency(account_id)
+                
+            elif intent.action == "CHECK_SITELINKS":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["sitelink_analysis"] = analysis_service.check_sitelinks(account_id)
+                
+            elif intent.action == "CHECK_LANDING_PAGE_URL":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["landing_page_analysis"] = analysis_service.check_landing_page_url(account_id)
+                
+            elif intent.action == "CHECK_DUPLICATE_KEYWORDS":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["duplicate_keyword_analysis"] = analysis_service.check_duplicate_keywords(account_id)
+                
+            elif intent.action == "ANALYZE_KEYWORD_TRENDS":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["keyword_trends_analysis"] = analysis_service.analyze_keyword_trends(account_id)
+                
+            elif intent.action == "ANALYZE_AUCTION_INSIGHTS":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["auction_insights_analysis"] = analysis_service.analyze_auction_insights(account_id)
+                
+            elif intent.action == "ANALYZE_SEARCH_TERMS":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["search_term_analysis"] = analysis_service.analyze_search_terms(account_id)
+                
+            elif intent.action == "ANALYZE_ADS_SHOWING_TIME":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["ads_showing_time_analysis"] = analysis_service.analyze_ads_showing_time(account_id)
+                
+            elif intent.action == "ANALYZE_DEVICE_PERFORMANCE_DETAILED":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["device_performance_detailed_analysis"] = analysis_service.analyze_device_performance_detailed(account_id)
+                
+            elif intent.action == "ANALYZE_LOCATION_PERFORMANCE":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["location_performance_analysis"] = analysis_service.analyze_location_performance(account_id)
+                
+            elif intent.action == "ANALYZE_LANDING_PAGE_MOBILE":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["landing_page_mobile_analysis"] = analysis_service.analyze_landing_page_mobile(account_id)
+                
+            elif intent.action == "OPTIMIZE_TCPA":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["tcpa_optimizations"] = analysis_service.optimize_tcpa(account_id)
+                
+            elif intent.action == "OPTIMIZE_BUDGET_ALLOCATION":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["budget_allocation_optimizations"] = analysis_service.optimize_budget_allocation(account_id)
+                
+            elif intent.action == "SUGGEST_NEGATIVE_KEYWORDS":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                account_id = intent.parameters.get("account_id")
+                results["negative_keyword_suggestions"] = analysis_service.suggest_negative_keywords(account_id)
+                
+            elif intent.action == "GET_ADS":
+                # Get ads for a specific product
+                from .langchain_tools import GoogleAdsTools
+                
+                product_type = intent.parameters.get("product", "general")
+                
+                # Initialize Google Ads tools
+                google_ads_tools = GoogleAdsTools(self.user, str(self.session.id) if self.session else None)
+                
+                # Get ads for the product
+                ads_result = google_ads_tools.get_ads_for_product(product_type)
+                
+                if "error" not in ads_result:
+                    results["ads_data"] = ads_result
+                    results["success_message"] = f"Successfully retrieved ads for {product_type}"
+                else:
+                    results["error"] = ads_result["error"]
+                    results["fallback_message"] = f"Unable to retrieve ads for {product_type}. Using RAG-enhanced response instead."
                     
+                    # Fallback to RAG system
+                    from .rag_service import GoogleAdsRAGService
+                    from .data_service import GoogleAdsDataService
+                    
+                    # Get user's Google Ads data for context
+                    data_service = GoogleAdsDataService(self.user)
+                    account_data = data_service.get_campaign_data()
+                    
+                    # Initialize RAG service
+                    rag_service = GoogleAdsRAGService(self.user)
+                    
+                    # Get hybrid response using smart context selection
+                    hybrid_response = rag_service.get_hybrid_response(f"ads for {product_type}", account_data)
+                    
+                    # Store the RAG-enhanced response
+                    results["rag_enhanced_response"] = hybrid_response
+                    results["fallback_action"] = intent.action
+                    results["fallback_message"] = f"Action '{intent.action}' not found. Generated RAG-enhanced AI response instead."
+                    results["response_type"] = hybrid_response.get("response_type", "unknown")
+                
+            elif intent.action == "CREATE_AD":
+                # Create ad with optional image generation
+                from .langchain_tools import GoogleAdsTools
+                
+                # Check if user wants images
+                wants_images = intent.parameters.get("image", False)
+                product_type = intent.parameters.get("product", "general product")
+                
+                # Initialize Google Ads tools
+                google_ads_tools = GoogleAdsTools(self.user, str(self.session.id) if self.session else None)
+                
+                # Generate creative suggestions first
+                creative_suggestions = google_ads_tools.get_creative_suggestions(
+                    product_type=product_type,
+                    target_audience="general",
+                    tone="professional"
+                )
+                
+                if "error" not in creative_suggestions:
+                    # Generate AI images if requested
+                    if wants_images:
+                        from .openai_service import GoogleAdsOpenAIService
+                        openai_service = GoogleAdsOpenAIService()
+                        
+                        # Generate image prompts based on creative suggestions
+                        image_prompts = creative_suggestions.get("suggestions", {}).get("image_suggestions", [])
+                        
+                        # Create image generation request
+                        image_generation_prompt = f"Create a professional product image for {product_type}. Style: modern, clean, professional. Include: product showcase, lifestyle context, high quality, suitable for advertising."
+                        
+                        try:
+                            # Generate image using OpenAI DALL-E
+                            image_response = openai_service.client.images.generate(
+                                model="dall-e-3",
+                                prompt=image_generation_prompt,
+                                size="1024x1024",
+                                quality="standard",
+                                n=1,
+                            )
+                            
+                            # Extract image URL
+                            generated_image_url = image_response.data[0].url
+                            
+                            # Create ad with the generated image
+                            ad_result = google_ads_tools.create_ad_with_image(
+                                product_type=product_type,
+                                headline=creative_suggestions["suggestions"]["headlines"][0],
+                                description=creative_suggestions["suggestions"]["descriptions"][0],
+                                final_url=f"https://example.com/products/{product_type.lower().replace(' ', '-')}",
+                                image_url=generated_image_url
+                            )
+                            
+                            if "error" not in ad_result:
+                                results["ad_created"] = True
+                                results["ad_data"] = ad_result
+                                results["generated_image_url"] = generated_image_url
+                                results["creative_suggestions"] = creative_suggestions
+                                results["success_message"] = f"Successfully created ad for {product_type} with AI-generated image"
+                            else:
+                                results["error"] = ad_result["error"]
+                                results["fallback_message"] = f"Ad creation failed, but here are creative suggestions for {product_type}"
+                                results["creative_suggestions"] = creative_suggestions
+                                
+                        except Exception as e:
+                            logger.error(f"Image generation failed: {e}")
+                            # Fallback to ad creation without image
+                            ad_result = google_ads_tools.create_ad(
+                                ad_group_id="auto_generated",
+                                headline=creative_suggestions["suggestions"]["headlines"][0],
+                                description=creative_suggestions["suggestions"]["descriptions"][0],
+                                final_url=f"https://example.com/products/{product_type.lower().replace(' ', '-')}"
+                            )
+                            
+                            if "error" not in ad_result:
+                                results["ad_created"] = True
+                                results["ad_data"] = ad_result
+                                results["creative_suggestions"] = creative_suggestions
+                                results["success_message"] = f"Successfully created ad for {product_type} (image generation failed)"
+                            else:
+                                results["error"] = ad_result["error"]
+                                results["fallback_message"] = f"Ad creation failed, but here are creative suggestions for {product_type}"
+                                results["creative_suggestions"] = creative_suggestions
+                    else:
+                        # Create ad without image
+                        ad_result = google_ads_tools.create_ad(
+                            ad_group_id="auto_generated",
+                            headline=creative_suggestions["suggestions"]["headlines"][0],
+                            description=creative_suggestions["suggestions"]["descriptions"][0],
+                            final_url=f"https://example.com/products/{product_type.lower().replace(' ', '-')}"
+                        )
+                        
+                        if "error" not in ad_result:
+                            results["ad_created"] = True
+                            results["ad_data"] = ad_result
+                            results["creative_suggestions"] = creative_suggestions
+                            results["success_message"] = f"Successfully created ad for {product_type}"
+                        else:
+                            results["error"] = ad_result["error"]
+                            results["fallback_message"] = f"Ad creation failed, but here are creative suggestions for {product_type}"
+                            results["creative_suggestions"] = creative_suggestions
+                else:
+                    results["error"] = creative_suggestions["error"]
+                    results["fallback_message"] = f"Unable to generate creative suggestions for {product_type}. Using RAG-enhanced response instead."
+                    
+                    # Even if creative suggestions fail, try to provide some basic ad creation guidance
+                    try:
+                        # Provide basic ad creation guidance
+                        basic_guidance = {
+                            "headlines": [f"Quality {product_type.title()}s", f"Best {product_type.title()}s", f"Premium {product_type.title()}s"],
+                            "descriptions": [f"Discover amazing {product_type.title()}s with superior quality.", f"Get the best {product_type.title()}s available."],
+                            "call_to_actions": ["Shop Now", "Learn More", "Get Started"],
+                            "image_suggestions": [f"Professional {product_type} showcase", f"High-quality {product_type} photography"]
+                        }
+                        
+                        results["basic_creative_guidance"] = basic_guidance
+                        results["message"] = f"Creative suggestions failed, but here's basic guidance for creating ads for {product_type}"
+                        
+                    except Exception as guidance_error:
+                        logger.error(f"Failed to provide basic guidance: {guidance_error}")
+                    
+                    # Fallback to RAG system
+                    from .rag_service import GoogleAdsRAGService
+                    from .data_service import GoogleAdsDataService
+                    
+                    # Get user's Google Ads data for context
+                    data_service = GoogleAdsDataService(self.user)
+                    account_data = data_service.get_campaign_data()
+                    
+                    # Initialize RAG service
+                    rag_service = GoogleAdsRAGService(self.user)
+                    
+                    # Get hybrid response using smart context selection
+                    hybrid_response = rag_service.get_hybrid_response(f"create ad for {product_type}", account_data)
+                    
+                    # Store the RAG-enhanced response
+                    results["rag_enhanced_response"] = hybrid_response
+                    results["fallback_action"] = intent.action
+                    results["fallback_message"] = f"Action '{intent.action}' partially failed. Generated RAG-enhanced AI response instead."
+                    results["response_type"] = hybrid_response.get("response_type", "unknown")
+                
+            elif intent.action == "GENERATE_IMAGES":
+                # Generate AI images for a product
+                from .langchain_tools import GoogleAdsTools
+                
+                product_type = intent.parameters.get("product", "general product")
+                image_count = intent.parameters.get("count", 3)
+                styles = intent.parameters.get("styles", ["professional", "lifestyle", "modern"])
+                
+                # Initialize Google Ads tools
+                google_ads_tools = GoogleAdsTools(self.user, str(self.session.id) if self.session else None)
+                
+                # Generate multiple images
+                images_result = google_ads_tools.generate_multiple_product_images(
+                    product_type=product_type,
+                    count=image_count,
+                    styles=styles
+                )
+                
+                if "error" not in images_result:
+                    results["images_generated"] = True
+                    results["images_data"] = images_result
+                    results["success_message"] = f"Successfully generated {images_result['total_generated']} AI images for {product_type}"
+                else:
+                    # Try single image generation as fallback
+                    single_image_result = google_ads_tools.generate_product_image(product_type)
+                    
+                    if "error" not in single_image_result:
+                        results["images_generated"] = True
+                        results["images_data"] = {
+                            "images": [single_image_result],
+                            "total_generated": 1
+                        }
+                        results["success_message"] = f"Successfully generated 1 AI image for {product_type}"
+                    else:
+                        results["error"] = single_image_result["error"]
+                        results["fallback_message"] = f"Image generation failed for {product_type}. Using RAG-enhanced response instead."
+                        
+                        # Fallback to RAG system
+                        from .rag_service import GoogleAdsRAGService
+                        from .data_service import GoogleAdsDataService
+                        
+                        # Get user's Google Ads data for context
+                        data_service = GoogleAdsDataService(self.user)
+                        account_data = data_service.get_campaign_data()
+                        
+                        # Initialize RAG service
+                        rag_service = GoogleAdsRAGService(self.user)
+                        
+                        # Get hybrid response using smart context selection
+                        hybrid_response = rag_service.get_hybrid_response(f"generate images for {product_type}", account_data)
+                        
+                        # Store the RAG-enhanced response
+                        results["rag_enhanced_response"] = hybrid_response
+                        results["fallback_action"] = intent.action
+                        results["fallback_message"] = f"Action '{intent.action}' not found. Generated RAG-enhanced AI response instead."
+                        results["response_type"] = hybrid_response.get("response_type", "unknown")
+                
+            # Fallback to RAG-enhanced OpenAI service for unmatched actions
             else:
-                results["message"] = f"Action {intent.action} not yet implemented"
+                # Use RAG system for intelligent context selection
+                from .rag_service import GoogleAdsRAGService
+                from .data_service import GoogleAdsDataService
+                
+                # Get user's Google Ads data for context
+                data_service = GoogleAdsDataService(self.user)
+                account_data = data_service.get_campaign_data()
+                
+                # Initialize RAG service
+                rag_service = GoogleAdsRAGService(self.user)
+                
+                # Create a meaningful query based on intent action
+                fallback_query = f"information about {intent.action.lower().replace('_', ' ')}"
+                if intent.parameters:
+                    # Add parameters to the query for better context
+                    param_str = ", ".join([f"{k}: {v}" for k, v in intent.parameters.items()])
+                    fallback_query = f"{fallback_query} with parameters: {param_str}"
+                
+                # Get hybrid response using smart context selection
+                hybrid_response = rag_service.get_hybrid_response(fallback_query, account_data)
+                
+                # Store the RAG-enhanced response
+                results["rag_enhanced_response"] = hybrid_response
+                results["fallback_action"] = intent.action
+                results["fallback_message"] = f"Action '{intent.action}' not found. Generated RAG-enhanced AI response instead."
+                results["response_type"] = hybrid_response.get("response_type", "unknown")
                 
         except Exception as e:
             logger.error(f"Tool execution failed: {e}")

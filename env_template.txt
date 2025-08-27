@@ -1,17 +1,27 @@
-# OpenAI API Configuration
-# Get your API key from: https://platform.openai.com/api-keys
-OPENAI_API_KEY=your_openai_api_key_here
+# OpenAI Configuration
+# Copy this file to .env and fill in your actual values
+OPENAI_API_KEY=sk-your-actual-openai-api-key-here
 
-# Google Ads API Configuration (if needed)
-GOOGLE_ADS_CLIENT_ID=your_google_ads_client_id
-GOOGLE_ADS_CLIENT_SECRET=your_google_ads_client_secret
-GOOGLE_ADS_DEVELOPER_TOKEN=your_developer_token
-GOOGLE_ADS_REFRESH_TOKEN=your_refresh_token
+# Google Ads Configuration
+GOOGLE_ADS_CLIENT_ID=your-google-ads-client-id
+GOOGLE_ADS_CLIENT_SECRET=your-google-ads-client-secret
+GOOGLE_ADS_DEVELOPER_TOKEN=your-google-ads-developer-token
+GOOGLE_ADS_REFRESH_TOKEN=your-google-ads-refresh-token
+GOOGLE_ADS_LOGIN_CUSTOMER_ID=your-google-ads-login-customer-id
 
 # Django Configuration
+SECRET_KEY=your-django-secret-key-here
 DEBUG=True
-SECRET_KEY=your_django_secret_key_here
 ALLOWED_HOSTS=localhost,127.0.0.1
 
 # Database Configuration
-DATABASE_URL=sqlite:///db.sqlite3
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+
+# Redis Configuration (for Celery)
+REDIS_URL=redis://localhost:6379/0
+
+# Instructions:
+# 1. Copy this file to .env: cp env_template.txt .env
+# 2. Edit .env with your actual values
+# 3. Never commit .env to version control
+# 4. Add .env to .gitignore

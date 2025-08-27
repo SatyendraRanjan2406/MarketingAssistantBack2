@@ -11,7 +11,7 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'marketing_assistant_project.settings')
 django.setup()
 
-from google_ads_app.models import GoogleAdsAccount
+from google_ads_new.models import GoogleAdsAccount
 from django.contrib.auth.models import User
 
 def add_google_ads_account():
