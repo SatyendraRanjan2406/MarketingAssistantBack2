@@ -95,7 +95,7 @@ The main changes were in these files:
 
 ```python
 # Before (HARDCODED - REMOVED):
-self.openai_api_key = "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"
+self.openai_api_key = 
 
 # After (ENVIRONMENT VARIABLE):
 self.openai_api_key = os.getenv('OPENAI_API_KEY')
