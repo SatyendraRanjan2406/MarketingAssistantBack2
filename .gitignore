@@ -22,10 +22,12 @@
 *.p12
 
 # Google Ads specific
-# google_ads_credentials*.json
-# google_ads_token*.json
-# google-ads*.yaml
-# google-ads*.yml
+google_ads_credentials*.json
+google_ads_token*.json
+google-ads*.yaml
+google-ads*.yml
+google-ads.yaml
+google-ads-test.yaml
 
 # Backup files
 *.backup

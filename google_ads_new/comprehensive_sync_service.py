@@ -35,10 +35,9 @@ logger = logging.getLogger(__name__)
 class ComprehensiveGoogleAdsSyncService:
     """Comprehensive service for syncing Google Ads data into database"""
     
-    def __init__(self, config_path: str = None):
-        self.config_path = config_path or os.path.join(
-            os.path.dirname(__file__), 'google-ads.yaml'
-        )
+    def __init__(self, user_id: int = None, manager_customer_id: str = None):
+        self.user_id = user_id
+        self.manager_customer_id = manager_customer_id
         self.client = None
         self.logger = logging.getLogger(__name__)
         
@@ -49,19 +48,39 @@ class ComprehensiveGoogleAdsSyncService:
             ga_logger.setLevel(logging.INFO)
     
     def initialize_client(self) -> bool:
-        """Initialize the Google Ads client"""
+        """Initialize the Google Ads client using database credentials"""
         try:
             if not GOOGLE_ADS_AVAILABLE:
                 self.logger.error("Google Ads library not available")
                 return False
             
-            if not os.path.exists(self.config_path):
-                self.logger.error(f"Google Ads config file not found: {self.config_path}")
-                return False
+            # Get credentials from database
+            from accounts.models import UserGoogleAuth
             
-            # Initialize the real Google Ads client
-            self.client = GoogleAdsClient.load_from_storage(self.config_path)
-            self.logger.info("Google Ads client initialized successfully")
+            if not self.user_id:
+                raise ValueError("User ID is required to get credentials from database")
+            
+            # Get the user's Google OAuth credentials
+            user_auth = UserGoogleAuth.objects.filter(
+                user_id=self.user_id,
+                is_active=True
+            ).first()
+            
+            if not user_auth:
+                raise ValueError(f"No active Google OAuth credentials found for user {self.user_id}")
+            
+            # Create credentials dictionary
+            credentials = {
+                'client_id': os.getenv('GOOGLE_OAUTH_CLIENT_ID'),
+                'client_secret': os.getenv('GOOGLE_OAUTH_CLIENT_SECRET'),
+                'developer_token': os.getenv('GOOGLE_ADS_DEVELOPER_TOKEN'),
+                'refresh_token': user_auth.refresh_token,
+                'login_customer_id': self.manager_customer_id or user_auth.google_ads_customer_id,
+            }
+            
+            # Initialize the Google Ads client
+            self.client = GoogleAdsClient.load_from_dict(credentials)
+            self.logger.info("Google Ads client initialized successfully from database credentials")
             return True
             
         except Exception as e:

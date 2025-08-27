@@ -1,4 +1,0 @@
-developer_token: INSERT_DEVELOPER_TOKEN_HERE
-login_customer_id: 1234567890
-json_key_file_path: INSERT_JSON_KEY_FILE_PATH_HERE
-use_proto_plus: true

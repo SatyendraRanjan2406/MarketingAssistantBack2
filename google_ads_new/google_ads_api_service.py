@@ -23,10 +23,9 @@ logger = logging.getLogger(__name__)
 class GoogleAdsAPIService:
     """Service for interacting with Google Ads API v28.0.0"""
     
-    def __init__(self, config_path: str = None):
-        self.config_path = config_path or os.path.join(
-            os.path.dirname(__file__), 'google-ads.yaml'
-        )
+    def __init__(self, user_id: int = None, customer_id: str = None):
+        self.user_id = user_id
+        self.customer_id = customer_id
         self.client = None
         self.logger = logging.getLogger(__name__)
         
@@ -36,20 +35,55 @@ class GoogleAdsAPIService:
             ga_logger.addHandler(logging.StreamHandler(sys.stdout))
             ga_logger.setLevel(logging.INFO)
     
+    def _get_credentials_from_db(self) -> Dict[str, Any]:
+        """Get Google Ads credentials from database for the current user"""
+        try:
+            from accounts.models import UserGoogleAuth
+            
+            if not self.user_id:
+                raise ValueError("User ID is required to get credentials from database")
+            
+            # Get the user's Google OAuth credentials
+            user_auth = UserGoogleAuth.objects.filter(
+                user_id=self.user_id,
+                is_active=True
+            ).first()
+            
+            if not user_auth:
+                raise ValueError(f"No active Google OAuth credentials found for user {self.user_id}")
+            
+            # Check if token needs refresh
+            if user_auth.needs_refresh():
+                self.logger.info("Token needs refresh, refreshing...")
+                # You can implement token refresh here or let the calling code handle it
+                pass
+            
+            # Return credentials in the format expected by Google Ads client
+            return {
+                'client_id': os.getenv('GOOGLE_OAUTH_CLIENT_ID'),
+                'client_secret': os.getenv('GOOGLE_OAUTH_CLIENT_SECRET'),
+                'developer_token': os.getenv('GOOGLE_ADS_DEVELOPER_TOKEN'),
+                'refresh_token': user_auth.refresh_token,
+                'login_customer_id': self.customer_id or user_auth.google_ads_customer_id,
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error getting credentials from database: {e}")
+            raise
+    
     def initialize_client(self) -> bool:
-        """Initialize the Google Ads client"""
+        """Initialize the Google Ads client using database credentials"""
         try:
             if not GOOGLE_ADS_AVAILABLE:
                 self.logger.error("Google Ads library not available")
                 return False
             
-            if not os.path.exists(self.config_path):
-                self.logger.error(f"Google Ads config file not found: {self.config_path}")
-                return False
+            # Get credentials from database
+            credentials = self._get_credentials_from_db()
             
-            # Initialize the real Google Ads client
-            self.client = GoogleAdsClient.load_from_storage(self.config_path)
-            self.logger.info("Google Ads client initialized successfully")
+            # Create client from credentials dictionary
+            self.client = GoogleAdsClient.load_from_dict(credentials)
+            self.logger.info("Google Ads client initialized successfully from database credentials")
             return True
             
         except Exception as e:
@@ -455,14 +489,18 @@ class GoogleAdsAPIService:
             self.logger.error(f"Error in get_pending_access_requests: {e}")
             return {'success': False, 'error': str(e)} 
 
-def send_link_request(manager_customer_id: str, client_customer_id: str, config_path: str = None) -> Dict[str, Any]:
+def send_link_request(manager_customer_id: str, client_customer_id: str, user_id: int = None) -> Dict[str, Any]:
     """
     Standalone function to send linking request using Google Ads API v28.0.0
     This matches the user's requested code structure
     """
     try:
-        # Load client from storage
-        client = GoogleAdsClient.load_from_storage(config_path or 'google-ads.yaml')
+        # Create API service instance with user credentials
+        api_service = GoogleAdsAPIService(user_id=user_id, customer_id=manager_customer_id)
+        if not api_service.initialize_client():
+            return {'success': False, 'error': 'Failed to initialize Google Ads client'}
+        
+        client = api_service.client
         
         # Get the service and operation types
         customer_client_link_service = client.get_service("CustomerClientLinkService")
