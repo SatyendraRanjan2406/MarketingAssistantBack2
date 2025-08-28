@@ -79,6 +79,120 @@ class ImageGenerator:
         Make it suitable for printing and digital use."""
         
         return self.generate_image(prompt, size="1024x1024", quality="standard", style="vivid")
+    
+    def generate_ad_copy_image(self, ad_copy: Dict[str, Any], variation_type: str, platform: str = "google_ads") -> Optional[str]:
+        """Generate contextual image for specific ad copy variation"""
+        
+        # Extract key information from ad copy
+        headline = ad_copy.get("headline", "")
+        description = ad_copy.get("description", "")
+        features = ad_copy.get("features", [])
+        advantages = ad_copy.get("advantages", [])
+        target_audience = ad_copy.get("target_audience", "")
+        cta = ad_copy.get("cta", "")
+        
+        # Create contextual prompt based on variation type and platform
+        if variation_type == "emotional_appeal":
+            prompt = f"""Create a compelling advertisement image for Google Ads that emphasizes emotional connection.
+            
+            Headline: "{headline}"
+            Description: "{description}"
+            Key Features: {', '.join(features[:3])}
+            Target Audience: {target_audience}
+            Call-to-Action: "{cta}"
+            
+            Style: Warm, emotional, people-focused design with soft lighting and relatable imagery.
+            Show the human side of the business with authentic expressions and warm colors.
+            Include visual elements that represent the emotional benefits mentioned in the ad copy.
+            Make it suitable for digital advertising with clear text hierarchy."""
+            
+        elif variation_type == "benefit_focused":
+            prompt = f"""Create a results-driven advertisement image for Google Ads that highlights concrete benefits.
+            
+            Headline: "{headline}"
+            Description: "{description}"
+            Key Advantages: {', '.join(advantages[:3])}
+            Target Audience: {target_audience}
+            Call-to-Action: "{cta}"
+            
+            Style: Bold, confident design with strong visual impact and clear benefit demonstration.
+            Use before/after scenarios, charts, or success imagery to show results.
+            Include visual elements that represent the specific benefits mentioned.
+            Make it suitable for digital advertising with high contrast and clear messaging."""
+            
+        elif variation_type == "social_proof":
+            prompt = f"""Create a trust-building advertisement image for Google Ads that emphasizes social proof.
+            
+            Headline: "{headline}"
+            Description: "{description}"
+            Key Features: {', '.join(features[:3])}
+            Target Audience: {target_audience}
+            Call-to-Action: "{cta}"
+            
+            Style: Professional, trustworthy design with elements that build credibility.
+            Include visual cues like testimonials, ratings, certifications, or professional imagery.
+            Use colors and imagery that convey reliability and expertise.
+            Make it suitable for digital advertising with clear trust indicators."""
+            
+        elif variation_type == "urgency_scarcity":
+            prompt = f"""Create an action-oriented advertisement image for Google Ads that creates urgency.
+            
+            Headline: "{headline}"
+            Description: "{description}"
+            Key Features: {', '.join(features[:3])}
+            Target Audience: {target_audience}
+            Call-to-Action: "{cta}"
+            
+            Style: Dynamic, energetic design with elements that convey time sensitivity.
+            Use visual cues like countdown timers, limited availability indicators, or action-oriented imagery.
+            Include colors and imagery that create excitement and urgency.
+            Make it suitable for digital advertising with clear urgency messaging."""
+            
+        else:
+            # Default creative variation
+            prompt = f"""Create a creative advertisement image for {platform} that showcases the unique value proposition.
+            
+            Headline: "{headline}"
+            Description: "{description}"
+            Key Features: {', '.join(features[:3])}
+            Key Advantages: {', '.join(advantages[:3])}
+            Target Audience: {target_audience}
+            Call-to-Action: "{cta}"
+            
+            Style: Creative, innovative design that stands out from competitors.
+            Use unique visual metaphors, creative layouts, or distinctive color schemes.
+            Include visual elements that represent the unique selling points.
+            Make it suitable for digital advertising with memorable and shareable design."""
+        
+        return self.generate_image(prompt, size="1024x1024", quality="standard", style="vivid")
+    
+    def generate_meta_ads_image(self, ad_copy: Dict[str, Any], ad_format: str = "feed") -> Optional[str]:
+        """Generate contextual image for Meta/Facebook Ads"""
+        
+        headline = ad_copy.get("headline", "")
+        description = ad_copy.get("description", "")
+        features = ad_copy.get("features", [])
+        advantages = ad_copy.get("advantages", [])
+        target_audience = ad_copy.get("target_audience", "")
+        cta = ad_copy.get("cta", "")
+        
+        # Meta Ads specific prompt
+        prompt = f"""Create a Facebook/Instagram advertisement image optimized for {ad_format} format.
+        
+        Headline: "{headline}"
+        Description: "{description}"
+        Key Features: {', '.join(features[:3])}
+        Key Advantages: {', '.join(advantages[:3])}
+        Target Audience: {target_audience}
+        Call-to-Action: "{cta}"
+        
+        Style: Social media optimized design with engaging visuals and clear messaging.
+        Use imagery that encourages social sharing and engagement.
+        Include visual elements that represent the social benefits and community aspects.
+        Make it suitable for mobile viewing with clear text and compelling visuals.
+        Optimize for {ad_format} format with appropriate aspect ratios and mobile-first design."""
+        
+        return self.generate_image(prompt, size="1024x1024", quality="standard", style="vivid")
 
 class ChatService:
     """Enhanced chat service with image generation for creative content"""
@@ -117,27 +231,93 @@ class ChatService:
                     if block.get("type") == "creative":
                         print(f"🎨 Generating image for: {block.get('title', 'Unknown')}")
                         
-                        # Generate image for this creative block
-                        image_url = self.image_generator.generate_poster_image(
-                            title=block.get("title", ""),
-                            description=block.get("description", ""),
-                            template_type=block.get("template_type", ""),
-                            color_scheme=block.get("color_scheme", ""),
-                            target_audience=block.get("target_audience", "")
-                        )
-                        
-                        if image_url:
-                            block["image_url"] = image_url
-                            print(f"✅ Image generated: {image_url[:50]}...")
+                        # Check if this is an ad copy variation or regular creative
+                        if "ad_copy_type" in block or "variation_type" in block:
+                            # This is an ad copy variation - generate contextual image
+                            self._generate_ad_copy_variation_image(block)
                         else:
-                            block["image_url"] = None
-                            print(f"⚠️  Failed to generate image for: {block.get('title')}")
+                            # Regular creative block - generate poster image
+                            image_url = self.image_generator.generate_poster_image(
+                                title=block.get("title", ""),
+                                description=block.get("description", ""),
+                                template_type=block.get("template_type", ""),
+                                color_scheme=block.get("color_scheme", ""),
+                                target_audience=block.get("target_audience", "")
+                            )
+                            
+                            if image_url:
+                                block["image_url"] = image_url
+                                print(f"✅ Poster image generated: {image_url[:50]}...")
+                            else:
+                                block["image_url"] = None
+                                print(f"⚠️  Failed to generate poster image for: {block.get('title')}")
             
             return response_data
             
         except Exception as e:
             print(f"❌ Error enhancing creative blocks with images: {e}")
             return response_data
+    
+    def _generate_ad_copy_variation_image(self, block: Dict[str, Any]) -> None:
+        """Generate contextual image for ad copy variation"""
+        try:
+            # Extract variation information
+            variation_type = block.get("variation_type", "default")
+            platform = block.get("platform", "google_ads")
+            ad_format = block.get("ad_format", "feed")
+            
+            # Create ad copy data structure for image generation
+            ad_copy_data = {
+                "headline": block.get("title", ""),
+                "description": block.get("description", ""),
+                "features": block.get("features", []),
+                "advantages": block.get("advantages", []),
+                "target_audience": block.get("target_audience", ""),
+                "cta": block.get("cta", ""),
+                "template_type": block.get("template_type", ""),
+                "color_scheme": block.get("color_scheme", "")
+            }
+            
+            # Generate platform-specific image
+            if platform.lower() == "meta_ads" or platform.lower() == "facebook":
+                image_url = self.image_generator.generate_meta_ads_image(ad_copy_data, ad_format)
+                platform_name = "Meta Ads"
+            else:
+                image_url = self.image_generator.generate_ad_copy_image(ad_copy_data, variation_type, platform)
+                platform_name = "Google Ads"
+            
+            if image_url:
+                block["image_url"] = image_url
+                block["image_context"] = {
+                    "variation_type": variation_type,
+                    "platform": platform,
+                    "ad_format": ad_format,
+                    "image_description": f"Contextual {platform_name} image for {variation_type} variation",
+                    "image_advantages": [
+                        f"Tailored to {variation_type} messaging approach",
+                        f"Optimized for {platform} platform",
+                        f"Highlights key features: {', '.join(ad_copy_data['features'][:2])}",
+                        f"Emphasizes advantages: {', '.join(ad_copy_data['advantages'][:2])}"
+                    ]
+                }
+                print(f"✅ {platform_name} image generated for {variation_type}: {image_url[:50]}...")
+            else:
+                block["image_url"] = None
+                block["image_context"] = {
+                    "error": "Failed to generate image",
+                    "variation_type": variation_type,
+                    "platform": platform
+                }
+                print(f"⚠️  Failed to generate {platform} image for {variation_type}")
+                
+        except Exception as e:
+            print(f"❌ Error generating ad copy variation image: {e}")
+            block["image_url"] = None
+            block["image_context"] = {
+                "error": str(e),
+                "variation_type": block.get("variation_type", "unknown"),
+                "platform": block.get("platform", "unknown")
+            }
     
     def start_session(self, title: str = None) -> str:
         """Start a new chat session"""
@@ -212,6 +392,7 @@ class ChatService:
     
     def process_message(self, user_message: str) -> Dict[str, Any]:
         """Process user message and generate response"""
+        response_content = None
         try:
             # Add user message to chat
             self.add_message("user", user_message)

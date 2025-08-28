@@ -30,7 +30,7 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure--morxpt9ise*7u7z0=f
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*','http://mktngasst.s3-website.ap-south-1.amazonaws.com/']
+ALLOWED_HOSTS = ['*','http://mktngasst.s3-website.ap-south-1.amazonaws.com/',"https://ce3df4640f22.ngrok-free.app/"]
 
 
 # Application definition
@@ -221,6 +221,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://mktngasst.s3-website.ap-south-1.amazonaws.com",
+    "https://ce3df4640f22.ngrok-free.app/"
 ]
 
 # CSRF exemption for API endpoints
@@ -236,7 +237,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
     "http://localhost:5173",
-    "http://mktngasst.s3-website.ap-south-1.amazonaws.com",
+    "http://mktngasst.s3-website.ap-south-1.amazonaws.com"
 ]
 
 # CORS with credentials support

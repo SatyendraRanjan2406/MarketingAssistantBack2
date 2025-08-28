@@ -845,80 +845,168 @@ class GoogleAdsAnalysisTools:
             if "indian" in context_lower:
                 business_keywords.extend(["indian", "local", "regional", "cultural"])
             
-            # Generate ad copy variations
+            # Generate ad copy variations with specific types and advantages
             ad_copies = []
             
             if platform == "google_ads":
-                # Google Ads specific copy variations
+                # Google Ads specific copy variations with variation types
                 ad_copies = [
                     {
+                        "title": f"Master {business_keywords[1] if len(business_keywords) > 1 else 'Your Subject'}",
+                        "description": f"Transform your {business_keywords[1] if len(business_keywords) > 1 else 'knowledge'} with proven strategies. Limited seats available!",
                         "headline1": f"Master {business_keywords[1] if len(business_keywords) > 1 else 'Your Subject'}",
                         "headline2": "Expert-Led Coaching",
                         "headline3": "Join Small Batch Classes",
-                        "description": f"Transform your {business_keywords[1] if len(business_keywords) > 1 else 'knowledge'} with proven strategies. Limited seats available!",
                         "cta": "Enroll Now",
                         "features": ["Expert Teachers", "Small Batch Size", "Proven Results"],
-                        "target_audience": "Students preparing for competitive exams"
+                        "advantages": [
+                            "Personalized attention in small groups",
+                            "Proven teaching methodologies",
+                            "Track record of student success"
+                        ],
+                        "target_audience": "Students preparing for competitive exams",
+                        "variation_type": "benefit_focused",
+                        "platform": "google_ads",
+                        "template_type": "Educational",
+                        "color_scheme": "Professional blues and whites"
                     },
                     {
+                        "title": f"Top {business_keywords[1] if len(business_keywords) > 1 else 'Coaching'} Center",
+                        "description": f"Join the best {business_keywords[0] if business_keywords else 'coaching'} center. Book your free demo class today!",
                         "headline1": f"Top {business_keywords[1] if len(business_keywords) > 1 else 'Coaching'} Center",
                         "headline2": "Guaranteed Success",
                         "headline3": "Free Demo Class",
-                        "description": f"Join the best {business_keywords[0] if business_keywords else 'coaching'} center. Book your free demo class today!",
                         "cta": "Book Demo",
                         "features": ["Free Demo", "Success Guarantee", "Expert Faculty"],
-                        "target_audience": "Parents and students seeking quality education"
+                        "advantages": [
+                            "Risk-free trial with free demo",
+                            "Guaranteed success commitment",
+                            "Access to expert faculty"
+                        ],
+                        "target_audience": "Parents and students seeking quality education",
+                        "variation_type": "social_proof",
+                        "platform": "google_ads",
+                        "template_type": "Marketing",
+                        "color_scheme": "Trustworthy blues and greens"
                     },
                     {
+                        "title": f"Best {business_keywords[1] if len(business_keywords) > 1 else 'Results'}",
+                        "description": f"Get personalized attention in small batches. {business_keywords[1] if len(business_keywords) > 1 else 'Subject'} made easy!",
                         "headline1": f"Best {business_keywords[1] if len(business_keywords) > 1 else 'Results'}",
                         "headline2": "Personal Attention",
                         "headline3": "Affordable Fees",
-                        "description": f"Get personalized attention in small batches. {business_keywords[1] if len(business_keywords) > 1 else 'Subject'} made easy!",
                         "cta": "Call Now",
                         "features": ["Personal Attention", "Affordable Fees", "Small Batches"],
-                        "target_audience": "Students looking for personalized coaching"
+                        "advantages": [
+                            "Individualized learning experience",
+                            "Cost-effective quality education",
+                            "Intimate learning environment"
+                        ],
+                        "target_audience": "Students looking for personalized coaching",
+                        "variation_type": "emotional_appeal",
+                        "platform": "google_ads",
+                        "template_type": "Educational",
+                        "color_scheme": "Warm oranges and yellows"
                     },
                     {
+                        "title": f"Expert {business_keywords[1] if len(business_keywords) > 1 else 'Coaching'}",
+                        "description": f"Learn from industry experts using proven methods. Don't miss out on limited seats!",
                         "headline1": f"Expert {business_keywords[1] if len(business_keywords) > 1 else 'Coaching'}",
                         "headline2": "Proven Methods",
                         "headline3": "Limited Seats",
-                        "description": f"Learn from industry experts using proven methods. Don't miss out on limited seats!",
                         "cta": "Apply Today",
                         "features": ["Expert Faculty", "Proven Methods", "Limited Seats"],
-                        "target_audience": "Serious students seeking expert guidance"
+                        "advantages": [
+                            "Industry expert guidance",
+                            "Time-tested methodologies",
+                            "Exclusive limited availability"
+                        ],
+                        "target_audience": "Serious students seeking expert guidance",
+                        "variation_type": "urgency_scarcity",
+                        "platform": "google_ads",
+                        "template_type": "Marketing",
+                        "color_scheme": "Dynamic reds and oranges"
                     }
                 ]
             
             elif platform == "meta_ads":
-                # Meta/Facebook ads specific copy variations
+                # Meta/Facebook ads specific copy variations with variation types
                 ad_copies = [
                     {
+                        "title": f"Transform Your {business_keywords[1] if len(business_keywords) > 1 else 'Future'}",
+                        "description": f"Join the leading {business_keywords[0] if business_keywords else 'coaching'} center. Expert teachers, small batches, and proven results. Limited seats available!",
                         "headline": f"Transform Your {business_keywords[1] if len(business_keywords) > 1 else 'Future'}",
                         "primary_text": f"Join the leading {business_keywords[0] if business_keywords else 'coaching'} center. Expert teachers, small batches, and proven results. Limited seats available!",
                         "cta": "Learn More",
                         "features": ["Expert Teachers", "Small Batches", "Proven Results"],
-                        "target_audience": "Students and parents on social media"
+                        "advantages": [
+                            "Life-changing educational transformation",
+                            "Proven track record of success",
+                            "Exclusive small batch experience"
+                        ],
+                        "target_audience": "Students and parents on social media",
+                        "variation_type": "emotional_appeal",
+                        "platform": "meta_ads",
+                        "ad_format": "feed",
+                        "template_type": "Social Media",
+                        "color_scheme": "Inspirational purples and blues"
                     },
                     {
+                        "title": f"Best {business_keywords[1] if len(business_keywords) > 1 else 'Coaching'} Center",
+                        "description": f"Get personalized attention and guaranteed success. Book your free demo class today and see the difference!",
                         "headline": f"Best {business_keywords[1] if len(business_keywords) > 1 else 'Coaching'} Center",
                         "primary_text": f"Get personalized attention and guaranteed success. Book your free demo class today and see the difference!",
                         "cta": "Book Demo",
                         "features": ["Free Demo", "Personal Attention", "Success Guarantee"],
-                        "target_audience": "Social media users seeking quality education"
+                        "advantages": [
+                            "No-risk trial experience",
+                            "Personalized learning approach",
+                            "Guaranteed success commitment"
+                        ],
+                        "target_audience": "Social media users seeking quality education",
+                        "variation_type": "social_proof",
+                        "platform": "meta_ads",
+                        "ad_format": "feed",
+                        "template_type": "Social Media",
+                        "color_scheme": "Trustworthy greens and blues"
                     },
                     {
+                        "title": f"Master {business_keywords[1] if len(business_keywords) > 1 else 'Your Skills'}",
+                        "description": f"Join our small batch classes with expert faculty. Affordable fees, proven methods, and limited seats available!",
                         "headline": f"Master {business_keywords[1] if len(business_keywords) > 1 else 'Your Skills'}",
                         "primary_text": f"Join our small batch classes with expert faculty. Affordable fees, proven methods, and limited seats available!",
                         "cta": "Enroll Now",
                         "features": ["Small Batches", "Expert Faculty", "Affordable Fees"],
-                        "target_audience": "Students looking for quality education"
+                        "advantages": [
+                            "Intimate learning environment",
+                            "Access to expert knowledge",
+                            "Value for money education"
+                        ],
+                        "target_audience": "Students looking for quality education",
+                        "variation_type": "benefit_focused",
+                        "platform": "meta_ads",
+                        "ad_format": "feed",
+                        "template_type": "Social Media",
+                        "color_scheme": "Professional grays with accent colors"
                     },
                     {
+                        "title": f"Expert {business_keywords[1] if len(business_keywords) > 1 else 'Guidance'}",
+                        "description": f"Learn from industry experts using proven methods. Don't miss out on this opportunity to excel in your studies!",
                         "headline": f"Expert {business_keywords[1] if len(business_keywords) > 1 else 'Guidance'}",
                         "primary_text": f"Learn from industry experts using proven methods. Don't miss out on this opportunity to excel in your studies!",
                         "cta": "Apply Today",
                         "features": ["Expert Guidance", "Proven Methods", "Limited Opportunity"],
-                        "target_audience": "Ambitious students seeking excellence"
+                        "advantages": [
+                            "Industry expert mentorship",
+                            "Time-tested learning methods",
+                            "Exclusive opportunity window"
+                        ],
+                        "target_audience": "Ambitious students seeking excellence",
+                        "variation_type": "urgency_scarcity",
+                        "platform": "meta_ads",
+                        "ad_format": "feed",
+                        "template_type": "Social Media",
+                        "color_scheme": "Dynamic reds and oranges"
                     }
                 ]
             

@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 from . import chat_views
+from . import live_monitoring_views
 
 # Create router for ViewSets
 router = DefaultRouter()
@@ -50,6 +51,20 @@ urlpatterns += [
     path('api/comprehensive-sync/', views.comprehensive_sync_view, name='comprehensive_sync'),
     path('api/sync-single-client/', views.sync_single_client_account, name='sync_single_client_account'),
     path('api/test-single-client-sync/', views.test_single_client_sync, name='test_single_client_sync'),
+]
+
+# Live Monitoring API endpoints
+urlpatterns += [
+    # Main live monitoring endpoint
+    path('api/live-monitoring/', live_monitoring_views.LiveMonitoringView.as_view(), name='live_monitoring'),
+    
+    # Account-specific live monitoring
+    path('api/live-monitoring/account/<int:account_id>/', live_monitoring_views.AccountLiveMonitoringView.as_view(), name='account_live_monitoring'),
+    
+    # Specific insights and metrics
+    path('api/live-monitoring/account/<int:account_id>/insights/', live_monitoring_views.LiveMonitoringInsightsView.as_view(), name='live_monitoring_insights'),
+    path('api/live-monitoring/account/<int:account_id>/quick-stats/', live_monitoring_views.LiveMonitoringQuickStatsView.as_view(), name='live_monitoring_quick_stats'),
+    path('api/live-monitoring/account/<int:account_id>/performance/', live_monitoring_views.LiveMonitoringPerformanceView.as_view(), name='live_monitoring_performance'),
 ]
 
 # Chat and AI Assistant endpoints
