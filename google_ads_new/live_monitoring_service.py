@@ -484,6 +484,9 @@ class LiveMonitoringService:
             else:
                 end_date = end_time
             
+            # Use proper field casting to avoid mixed type issues
+            from django.db.models import F, ExpressionWrapper, DecimalField
+            
             performance = GoogleAdsPerformance.objects.filter(
                 account_id=self.account_id,
                 date__gte=start_date,
@@ -492,22 +495,22 @@ class LiveMonitoringService:
                 impressions=Coalesce(Sum('impressions'), 0),
                 clicks=Coalesce(Sum('clicks'), 0),
                 cost_micros=Coalesce(Sum('cost_micros'), 0),
-                conversions=Coalesce(Sum('conversions'), 0),
-                conversion_value=Coalesce(Sum('conversion_value'), 0)
+                conversions=Coalesce(Sum(F('conversions')), 0),
+                conversion_value=Coalesce(Sum(F('conversion_value')), 0)
             )
             
             if performance['impressions'] > 0:
                 # Calculate derived metrics
-                cost = performance['cost_micros'] / 1000000  # Convert from micros
-                ctr = performance['clicks'] / performance['impressions']
-                cpc = cost / performance['clicks'] if performance['clicks'] > 0 else 0
-                cpm = (cost / performance['impressions']) * 1000 if performance['impressions'] > 0 else 0
-                conversion_rate = performance['conversions'] / performance['clicks'] if performance['clicks'] > 0 else 0
-                roas = performance['conversion_value'] / cost if cost > 0 else 0
+                cost = float(performance['cost_micros']) / 1000000  # Convert from micros
+                ctr = float(performance['clicks']) / float(performance['impressions'])
+                cpc = cost / float(performance['clicks']) if performance['clicks'] > 0 else 0
+                cpm = (cost / float(performance['impressions'])) * 1000 if performance['impressions'] > 0 else 0
+                conversion_rate = float(performance['conversions']) / float(performance['clicks']) if performance['clicks'] > 0 else 0
+                roas = float(performance['conversion_value']) / cost if cost > 0 else 0
                 
                 return {
-                    "impressions": performance['impressions'],
-                    "clicks": performance['clicks'],
+                    "impressions": int(performance['impressions']),
+                    "clicks": int(performance['clicks']),
                     "cost": round(cost, 2),
                     "conversions": float(performance['conversions']),
                     "conversion_value": float(performance['conversion_value']),

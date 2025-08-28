@@ -26,18 +26,18 @@ def test_live_monitoring_service():
     print("=" * 50)
     
     try:
-        # Get the first user and account
-        user = User.objects.first()
+        # Get the testuser and their account
+        user = User.objects.get(username='testuser')
         if not user:
-            print("❌ No users found in database")
+            print("❌ testuser not found in database")
             return False
         
         account = GoogleAdsAccount.objects.filter(user=user).first()
         if not account:
-            print("❌ No Google Ads accounts found for user")
+            print("❌ No Google Ads accounts found for testuser")
             return False
         
-        print(f"✅ Testing with user: {user.username}")
+        print(f"✅ Testing with user: {user.username} (ID: {user.id})")
         print(f"✅ Testing with account: {account.account_name} (ID: {account.id})")
         
         # Test the monitoring service
@@ -83,16 +83,31 @@ def test_api_endpoints():
     print("\n🌐 Testing Live Monitoring API Endpoints")
     print("=" * 50)
     
+    # Get the test account ID
+    try:
+        user = User.objects.get(username='testuser')
+        account = GoogleAdsAccount.objects.filter(user=user).first()
+        if not account:
+            print("❌ No test account found")
+            return
+        
+        account_id = account.id
+        print(f"✅ Testing with account ID: {account_id}")
+        
+    except Exception as e:
+        print(f"❌ Error getting test account: {e}")
+        return
+    
     # Base URL for the API
     base_url = "http://localhost:8000"
     
-    # Test endpoints
+    # Test endpoints - using the correct URL prefix
     endpoints = [
-        "/google_ads_new/api/live-monitoring/",
-        "/google_ads_new/api/live-monitoring/account/1/",
-        "/google_ads_new/api/live-monitoring/account/1/quick-stats/",
-        "/google_ads_new/api/live-monitoring/account/1/insights/",
-        "/google_ads_new/api/live-monitoring/account/1/performance/",
+        f"/google-ads-new/api/live-monitoring/",
+        f"/google-ads-new/api/live-monitoring/account/{account_id}/",
+        f"/google-ads-new/api/live-monitoring/account/{account_id}/quick-stats/",
+        f"/google-ads-new/api/live-monitoring/account/{account_id}/insights/",
+        f"/google-ads-new/api/live-monitoring/account/{account_id}/performance/",
     ]
     
     for endpoint in endpoints:

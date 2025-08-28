@@ -7,7 +7,7 @@ Provides REST API endpoints for live monitoring data
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
 import logging
@@ -16,6 +16,22 @@ from .models import GoogleAdsAccount
 from .live_monitoring_service import LiveMonitoringService
 
 logger = logging.getLogger(__name__)
+
+class GoogleAdsAccountAccessPermission(BasePermission):
+    """
+    Custom permission to ensure users can only access their own Google Ads accounts
+    """
+    
+    def has_permission(self, request, view):
+        """Check if user has permission to access Google Ads accounts"""
+        return request.user.is_authenticated
+    
+    def has_object_permission(self, request, view, obj):
+        """Check if user has permission to access specific Google Ads account"""
+        # For account-specific views, obj should be the GoogleAdsAccount
+        if hasattr(obj, 'user'):
+            return obj.user == request.user
+        return False
 
 class LiveMonitoringView(APIView):
     """Main live monitoring endpoint for all accounts"""
@@ -27,22 +43,30 @@ class LiveMonitoringView(APIView):
         try:
             user = request.user
             
-            # Get all user's Google Ads accounts
+            # Get all user's Google Ads accounts - ONLY accounts owned by this user
             accounts = GoogleAdsAccount.objects.filter(
                 user=user,
                 is_active=True
-            )
+            ).select_related('user')
             
             if not accounts.exists():
                 return Response({
                     "status": "error",
-                    "message": "No active Google Ads accounts found",
+                    "message": "No active Google Ads accounts found for your user account",
                     "data": None
                 }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Log access for security monitoring
+            logger.info(f"User {user.username} (ID: {user.id}) accessed live monitoring for {accounts.count()} accounts")
             
             # Get monitoring data for each account
             all_accounts_data = []
             for account in accounts:
+                # Double-check ownership (defense in depth)
+                if account.user != user:
+                    logger.warning(f"Security warning: User {user.username} attempted to access account {account.id} owned by {account.user.username}")
+                    continue
+                
                 monitoring_service = LiveMonitoringService(account.id)
                 account_data = monitoring_service.get_live_monitoring_data()
                 
@@ -58,16 +82,21 @@ class LiveMonitoringView(APIView):
             
             return Response({
                 "status": "success",
-                "message": "Live monitoring data retrieved successfully",
+                "message": f"Live monitoring data retrieved successfully for {len(all_accounts_data)} accounts",
                 "data": {
                     "accounts": all_accounts_data,
                     "aggregated": aggregated_data,
-                    "total_accounts": len(all_accounts_data)
+                    "total_accounts": len(all_accounts_data),
+                    "user_info": {
+                        "username": user.username,
+                        "user_id": user.id,
+                        "access_level": "owner"
+                    }
                 }
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            logger.error(f"Error in live monitoring view: {e}")
+            logger.error(f"Error in live monitoring view for user {request.user.username}: {e}")
             return Response({
                 "status": "error",
                 "message": f"Failed to retrieve monitoring data: {str(e)}",
@@ -146,20 +175,37 @@ class LiveMonitoringView(APIView):
 class AccountLiveMonitoringView(APIView):
     """Live monitoring endpoint for a specific account"""
     
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, GoogleAdsAccountAccessPermission]
     
     def get(self, request, account_id):
         """Get live monitoring data for a specific account"""
         try:
             user = request.user
             
-            # Get the specific account
-            account = get_object_or_404(
-                GoogleAdsAccount,
-                id=account_id,
-                user=user,
-                is_active=True
-            )
+            # Get the specific account and verify ownership
+            try:
+                account = GoogleAdsAccount.objects.get(
+                    id=account_id,
+                    is_active=True
+                )
+            except GoogleAdsAccount.DoesNotExist:
+                return Response({
+                    "status": "error",
+                    "message": "Google Ads account not found",
+                    "data": None
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # CRITICAL: Verify user owns this account
+            if account.user != user:
+                logger.warning(f"Security violation: User {user.username} (ID: {user.id}) attempted to access account {account_id} owned by {account.user.username}")
+                return Response({
+                    "status": "error",
+                    "message": "Access denied: You can only access your own Google Ads accounts",
+                    "data": None
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Log successful access
+            logger.info(f"User {user.username} (ID: {user.id}) accessed live monitoring for account {account.account_name} (ID: {account_id})")
             
             # Get monitoring data for this account
             monitoring_service = LiveMonitoringService(account.id)
@@ -175,9 +221,16 @@ class AccountLiveMonitoringView(APIView):
                         "customer_id": account.customer_id,
                         "currency_code": account.currency_code,
                         "time_zone": account.time_zone,
-                        "last_sync_at": account.last_sync_at.isoformat() if account.last_sync_at else None
+                        "last_sync_at": account.last_sync_at.isoformat() if account.last_sync_at else None,
+                        "ownership_verified": True,
+                        "access_level": "owner"
                     },
-                    "monitoring": monitoring_data
+                    "monitoring": monitoring_data,
+                    "user_info": {
+                        "username": user.username,
+                        "user_id": user.id,
+                        "access_verified": True
+                    }
                 }
             }, status=status.HTTP_200_OK)
             
@@ -188,7 +241,7 @@ class AccountLiveMonitoringView(APIView):
                 "data": None
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.error(f"Error in account live monitoring view: {e}")
+            logger.error(f"Error in account live monitoring view for user {request.user.username}, account {account_id}: {e}")
             return Response({
                 "status": "error",
                 "message": f"Failed to retrieve monitoring data: {str(e)}",
@@ -198,20 +251,37 @@ class AccountLiveMonitoringView(APIView):
 class LiveMonitoringInsightsView(APIView):
     """Get specific insights from live monitoring"""
     
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, GoogleAdsAccountAccessPermission]
     
     def get(self, request, account_id):
         """Get specific insights for an account"""
         try:
             user = request.user
             
-            # Get the specific account
-            account = get_object_or_404(
-                GoogleAdsAccount,
-                id=account_id,
-                user=user,
-                is_active=True
-            )
+            # Get the specific account and verify ownership
+            try:
+                account = GoogleAdsAccount.objects.get(
+                    id=account_id,
+                    is_active=True
+                )
+            except GoogleAdsAccount.DoesNotExist:
+                return Response({
+                    "status": "error",
+                    "message": "Google Ads account not found",
+                    "data": None
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # CRITICAL: Verify user owns this account
+            if account.user != user:
+                logger.warning(f"Security violation: User {user.username} attempted to access insights for account {account_id}")
+                return Response({
+                    "status": "error",
+                    "message": "Access denied: You can only access your own Google Ads accounts",
+                    "data": None
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Log successful access
+            logger.info(f"User {user.username} accessed insights for account {account.account_name} (ID: {account_id})")
             
             # Get monitoring service
             monitoring_service = LiveMonitoringService(account.id)
@@ -242,10 +312,16 @@ class LiveMonitoringInsightsView(APIView):
                 "data": {
                     "account": {
                         "id": account.id,
-                        "name": account.account_name
+                        "name": account.account_name,
+                        "ownership_verified": True
                     },
                     "insights_type": insights_type,
-                    "insights": insights
+                    "insights": insights,
+                    "user_info": {
+                        "username": user.username,
+                        "user_id": user.id,
+                        "access_verified": True
+                    }
                 }
             }, status=status.HTTP_200_OK)
             
@@ -256,7 +332,7 @@ class LiveMonitoringInsightsView(APIView):
                 "data": None
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.error(f"Error in insights view: {e}")
+            logger.error(f"Error in insights view for user {request.user.username}, account {account_id}: {e}")
             return Response({
                 "status": "error",
                 "message": f"Failed to retrieve insights: {str(e)}",
@@ -266,20 +342,37 @@ class LiveMonitoringInsightsView(APIView):
 class LiveMonitoringQuickStatsView(APIView):
     """Get quick stats for live monitoring"""
     
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, GoogleAdsAccountAccessPermission]
     
     def get(self, request, account_id):
         """Get quick stats for an account"""
         try:
             user = request.user
             
-            # Get the specific account
-            account = get_object_or_404(
-                GoogleAdsAccount,
-                id=account_id,
-                user=user,
-                is_active=True
-            )
+            # Get the specific account and verify ownership
+            try:
+                account = GoogleAdsAccount.objects.get(
+                    id=account_id,
+                    is_active=True
+                )
+            except GoogleAdsAccount.DoesNotExist:
+                return Response({
+                    "status": "error",
+                    "message": "Google Ads account not found",
+                    "data": None
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # CRITICAL: Verify user owns this account
+            if account.user != user:
+                logger.warning(f"Security violation: User {user.username} attempted to access quick stats for account {account_id}")
+                return Response({
+                    "status": "error",
+                    "message": "Access denied: You can only access your own Google Ads accounts",
+                    "data": None
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Log successful access
+            logger.info(f"User {user.username} accessed quick stats for account {account.account_name} (ID: {account_id})")
             
             # Get monitoring service
             monitoring_service = LiveMonitoringService(account.id)
@@ -294,10 +387,16 @@ class LiveMonitoringQuickStatsView(APIView):
                 "data": {
                     "account": {
                         "id": account.id,
-                        "name": account.account_name
+                        "name": account.account_name,
+                        "ownership_verified": True
                     },
                     "quick_stats": quick_stats,
-                    "campaign_overview": campaign_overview
+                    "campaign_overview": campaign_overview,
+                    "user_info": {
+                        "username": user.username,
+                        "user_id": user.id,
+                        "access_verified": True
+                    }
                 }
             }, status=status.HTTP_200_OK)
             
@@ -308,7 +407,7 @@ class LiveMonitoringQuickStatsView(APIView):
                 "data": None
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.error(f"Error in quick stats view: {e}")
+            logger.error(f"Error in quick stats view for user {request.user.username}, account {account_id}: {e}")
             return Response({
                 "status": "error",
                 "message": f"Failed to retrieve quick stats: {str(e)}",
@@ -318,20 +417,37 @@ class LiveMonitoringQuickStatsView(APIView):
 class LiveMonitoringPerformanceView(APIView):
     """Get detailed performance metrics"""
     
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, GoogleAdsAccountAccessPermission]
     
     def get(self, request, account_id):
         """Get detailed performance metrics for an account"""
         try:
             user = request.user
             
-            # Get the specific account
-            account = get_object_or_404(
-                GoogleAdsAccount,
-                id=account_id,
-                user=user,
-                is_active=True
-            )
+            # Get the specific account and verify ownership
+            try:
+                account = GoogleAdsAccount.objects.get(
+                    id=account_id,
+                    is_active=True
+                )
+            except GoogleAdsAccount.DoesNotExist:
+                return Response({
+                    "status": "error",
+                    "message": "Google Ads account not found",
+                    "data": None
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # CRITICAL: Verify user owns this account
+            if account.user != user:
+                logger.warning(f"Security violation: User {user.username} attempted to access performance metrics for account {account_id}")
+                return Response({
+                    "status": "error",
+                    "message": "Access denied: You can only access your own Google Ads accounts",
+                    "data": None
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Log successful access
+            logger.info(f"User {user.username} accessed performance metrics for account {account.account_name} (ID: {account_id})")
             
             # Get monitoring service
             monitoring_service = LiveMonitoringService(account.id)
@@ -347,11 +463,17 @@ class LiveMonitoringPerformanceView(APIView):
                 "data": {
                     "account": {
                         "id": account.id,
-                        "name": account.account_name
+                        "name": account.account_name,
+                        "ownership_verified": True
                     },
                     "performance_metrics": performance_metrics,
                     "budget_insights": budget_insights,
-                    "conversion_insights": conversion_insights
+                    "conversion_insights": conversion_insights,
+                    "user_info": {
+                        "username": user.username,
+                        "user_id": user.id,
+                        "access_verified": True
+                    }
                 }
             }, status=status.HTTP_200_OK)
             
@@ -362,7 +484,7 @@ class LiveMonitoringPerformanceView(APIView):
                 "data": None
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.error(f"Error in performance view: {e}")
+            logger.error(f"Error in performance view for user {request.user.username}, account {account_id}: {e}")
             return Response({
                 "status": "error",
                 "message": f"Failed to retrieve performance metrics: {str(e)}",
