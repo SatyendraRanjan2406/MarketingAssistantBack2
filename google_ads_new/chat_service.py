@@ -12,6 +12,9 @@ import logging
 from datetime import datetime, date
 from decimal import Decimal
 
+import os
+import requests
+
 logger = logging.getLogger(__name__)
 
 class CustomJSONEncoder(json.JSONEncoder):
@@ -25,13 +28,116 @@ class CustomJSONEncoder(json.JSONEncoder):
             return float(obj)
         return super().default(obj)
 
+class ImageGenerator:
+    """Handles image generation using OpenAI DALL-E API"""
+    
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = "https://api.openai.com/v1/images/generations"
+        self.headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+    
+    def generate_image(self, prompt: str, size: str = "1024x1024", quality: str = "standard", style: str = "vivid") -> Optional[str]:
+        """Generate an image using DALL-E and return the URL"""
+        try:
+            payload = {
+                "model": "dall-e-3",
+                "prompt": prompt,
+                "size": size,
+                "quality": quality,
+                "style": style,
+                "n": 1
+            }
+            
+            response = requests.post(self.base_url, headers=self.headers, json=payload, timeout=60)
+            response.raise_for_status()
+            
+            result = response.json()
+            if result.get("data") and len(result["data"]) > 0:
+                image_url = result["data"][0]["url"]
+                return image_url
+            
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error generating image: {e}")
+            return None
+    
+    def generate_poster_image(self, title: str, description: str, template_type: str, color_scheme: str, target_audience: str) -> Optional[str]:
+        """Generate a poster image based on creative specifications"""
+        prompt = f"""Create a professional poster design for "{title}". 
+        
+        Description: {description}
+        Template Type: {template_type}
+        Color Scheme: {color_scheme}
+        Target Audience: {target_audience}
+        
+        Style: Modern, professional, educational poster with clean typography, balanced layout, and visual hierarchy. 
+        Include placeholder elements for text and imagery that would be added later.
+        Make it suitable for printing and digital use."""
+        
+        return self.generate_image(prompt, size="1024x1024", quality="standard", style="vivid")
+
 class ChatService:
-    """Main chat service that orchestrates the AI assistant"""
+    """Enhanced chat service with image generation for creative content"""
     
     def __init__(self, user: User):
         self.user = user
         self.session = None
         self.memory_window = 10  # Remember last 10 messages
+        self.image_generator = None
+        self.initialize_image_generator()
+    
+    def initialize_image_generator(self):
+        """Initialize the image generator with OpenAI API key"""
+        openai_api_key = os.getenv('OPENAI_API_KEY')
+        if openai_api_key:
+            try:
+                self.image_generator = ImageGenerator(openai_api_key)
+                print("✅ Image generator initialized successfully")
+            except Exception as e:
+                print(f"❌ Error initializing image generator: {e}")
+                self.image_generator = None
+        else:
+            print("⚠️  OPENAI_API_KEY not found - image generation disabled")
+    
+    def enhance_creative_blocks_with_images(self, response_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Add image URLs to creative blocks in the response"""
+        if not self.image_generator:
+            print("⚠️  Image generator not available - skipping image generation")
+            return response_data
+        
+        try:
+            if "response" in response_data and "blocks" in response_data["response"]:
+                blocks = response_data["response"]["blocks"]
+                
+                for block in blocks:
+                    if block.get("type") == "creative":
+                        print(f"🎨 Generating image for: {block.get('title', 'Unknown')}")
+                        
+                        # Generate image for this creative block
+                        image_url = self.image_generator.generate_poster_image(
+                            title=block.get("title", ""),
+                            description=block.get("description", ""),
+                            template_type=block.get("template_type", ""),
+                            color_scheme=block.get("color_scheme", ""),
+                            target_audience=block.get("target_audience", "")
+                        )
+                        
+                        if image_url:
+                            block["image_url"] = image_url
+                            print(f"✅ Image generated: {image_url[:50]}...")
+                        else:
+                            block["image_url"] = None
+                            print(f"⚠️  Failed to generate image for: {block.get('title')}")
+            
+            return response_data
+            
+        except Exception as e:
+            print(f"❌ Error enhancing creative blocks with images: {e}")
+            return response_data
     
     def start_session(self, title: str = None) -> str:
         """Start a new chat session"""
@@ -142,24 +248,61 @@ class ChatService:
             # Generate UI response
             ui_response = llm_setup.generate_ui_response(tool_results, user_message)
             
-            # Add assistant response to chat
-            response_content = json.dumps(ui_response.dict(), indent=2, cls=CustomJSONEncoder)
-            self.add_message("assistant", response_content, {
-                "intent": intent.dict(),
-                "tool_results": tool_results,
-                "ui_blocks": ui_response.dict()
-            })
+            # Check if this is a creative content request that needs image generation
+            creative_actions = ["POSTER_GENERATOR", "GENERATE_CREATIVE", "GENERATE_AD_COPIES", "GENERATE_CREATIVES", "META_ADS_CREATIVES"]
             
-            # Update session
-            self.session.updated_at = timezone.now()
-            self.session.save()
-            
-            return {
-                "success": True,
-                "session_id": str(self.session.id),
-                "response": ui_response.dict(),
-                "intent": intent.dict()
-            }
+            if intent.action in creative_actions:
+                print(f"🎨 Creative content detected ({intent.action}) - enhancing with images...")
+                
+                # Convert UI response to dict for image enhancement
+                ui_response_dict = ui_response.dict()
+                
+                # Enhance creative blocks with images
+                enhanced_response = self.enhance_creative_blocks_with_images({
+                    "response": ui_response_dict
+                })
+                
+                # Update the UI response with enhanced data
+                ui_response_dict = enhanced_response["response"]
+                
+                # Add assistant response to chat with enhanced data
+                response_content = json.dumps(ui_response_dict, indent=2, cls=CustomJSONEncoder)
+                self.add_message("assistant", response_content, {
+                    "intent": intent.dict(),
+                    "tool_results": tool_results,
+                    "ui_blocks": ui_response_dict
+                })
+                
+                # Update session
+                self.session.updated_at = timezone.now()
+                self.session.save()
+                
+                return {
+                    "success": True,
+                    "session_id": str(self.session.id),
+                    "response": ui_response_dict,
+                    "intent": intent.dict()
+                }
+            else:
+                # Regular processing without image generation
+                # Add assistant response to chat
+                response_content = json.dumps(ui_response.dict(), indent=2, cls=CustomJSONEncoder)
+                self.add_message("assistant", response_content, {
+                    "intent": intent.dict(),
+                    "tool_results": tool_results,
+                    "ui_blocks": ui_response.dict()
+                })
+                
+                # Update session
+                self.session.updated_at = timezone.now()
+                self.session.save()
+                
+                return {
+                    "success": True,
+                    "session_id": str(self.session.id),
+                    "response": ui_response.dict(),
+                    "intent": intent.dict()
+                }
             
         except Exception as e:
             logger.error(f"Error processing message: {e}")
@@ -377,8 +520,124 @@ class ChatService:
             elif intent.action == "ANALYZE_AUDIENCE":
                 from .analysis_service import GoogleAdsAnalysisService
                 analysis_service = GoogleAdsAnalysisService(self.user)
-                account_id = intent.parameters.get("account_id")
-                results["audience_analysis"] = analysis_service.analyze_audience(account_id)
+                
+                results["audience_analysis"] = analysis_service.analyze_audience()
+                
+            elif intent.action == "OPTIMIZE_CAMPAIGN":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                
+                campaign_id = intent.parameters.get("campaign_id")
+                results["optimization_suggestions"] = analysis_service.optimize_campaign(campaign_id)
+                
+            elif intent.action == "CHECK_CAMPAIGN_CONSISTENCY":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                
+                results["consistency_check"] = analysis_service.check_campaign_consistency()
+                
+            elif intent.action == "CHECK_SITELINKS":
+                from .analysis_service import GoogleAdsAnalysisService
+                analysis_service = GoogleAdsAnalysisService(self.user)
+                
+                results["sitelinks_analysis"] = analysis_service.check_sitelinks()
+                
+            # Google Ads analysis tools
+            elif intent.action == "CAMPAIGN_SUMMARY_COMPARISON":
+                from .google_ads_analysis_tools import GoogleAdsAnalysisTools
+                analysis_tools = GoogleAdsAnalysisTools(self.user, str(self.session.id) if self.session else None)
+                
+                sort_by = intent.parameters.get("sort_by", "spend")
+                limit = intent.parameters.get("limit", 10)
+                results.update(analysis_tools.analyze_campaign_summary_comparison(sort_by, limit))
+                
+            elif intent.action == "PERFORMANCE_SUMMARY":
+                from .google_ads_analysis_tools import GoogleAdsAnalysisTools
+                analysis_tools = GoogleAdsAnalysisTools(self.user, str(self.session.id) if self.session else None)
+                
+                days = intent.parameters.get("days", 30)
+                results.update(analysis_tools.analyze_performance_summary(days))
+                
+            elif intent.action == "TREND_ANALYSIS":
+                from .google_ads_analysis_tools import GoogleAdsAnalysisTools
+                analysis_tools = GoogleAdsAnalysisTools(self.user, str(self.session.id) if self.session else None)
+                
+                metric = intent.parameters.get("metric", "clicks")
+                days = intent.parameters.get("days", 30)
+                results.update(analysis_tools.analyze_trends(metric, days))
+                
+            elif intent.action == "LISTING_ANALYSIS":
+                from .google_ads_analysis_tools import GoogleAdsAnalysisTools
+                analysis_tools = GoogleAdsAnalysisTools(self.user, str(self.session.id) if self.session else None)
+                
+                listing_type = intent.parameters.get("listing_type", "campaigns")
+                limit = intent.parameters.get("limit", 10)
+                sort_by = intent.parameters.get("sort_by", "conversions")
+                days = intent.parameters.get("days", 14)
+                results.update(analysis_tools.analyze_listing_performance(listing_type, limit, sort_by, days))
+                
+            elif intent.action == "QUERY_WITHOUT_SOLUTION":
+                from .google_ads_analysis_tools import GoogleAdsAnalysisTools
+                analysis_tools = GoogleAdsAnalysisTools(self.user, str(self.session.id) if self.session else None)
+                
+                query = intent.parameters.get("query", "")
+                results.update(analysis_tools.handle_query_without_solution(query))
+                
+            elif intent.action == "PIE_CHART_DISPLAY":
+                from .google_ads_analysis_tools import GoogleAdsAnalysisTools
+                analysis_tools = GoogleAdsAnalysisTools(self.user, str(self.session.id) if self.session else None)
+                
+                chart_type = intent.parameters.get("chart_type", "spend")
+                days = intent.parameters.get("days", 30)
+                results.update(analysis_tools.analyze_pie_chart_data(chart_type, days))
+                
+            elif intent.action == "DUPLICATE_KEYWORDS_ANALYSIS":
+                from .google_ads_analysis_tools import GoogleAdsAnalysisTools
+                analysis_tools = GoogleAdsAnalysisTools(self.user, str(self.session.id) if self.session else None)
+                
+                days = intent.parameters.get("days", 7)
+                results.update(analysis_tools.analyze_duplicate_keywords(days))
+                
+            elif intent.action == "DIG_DEEPER_ANALYSIS":
+                from .google_ads_analysis_tools import GoogleAdsAnalysisTools
+                analysis_tools = GoogleAdsAnalysisTools(self.user, str(self.session.id) if self.session else None)
+                
+                base_analysis = intent.parameters.get("base_analysis", {})
+                depth = intent.parameters.get("depth", 1)
+                results.update(analysis_tools.dig_deeper_analysis(base_analysis, depth))
+                
+            # Creative generation tools
+            elif intent.action == "GENERATE_AD_COPIES":
+                from .google_ads_analysis_tools import GoogleAdsAnalysisTools
+                analysis_tools = GoogleAdsAnalysisTools(self.user, str(self.session.id) if self.session else None)
+                
+                context = intent.parameters.get("context", "")
+                platform = intent.parameters.get("platform", "google_ads")
+                variations = intent.parameters.get("variations", 4)
+                results.update(analysis_tools.generate_ad_copies(context, platform, variations))
+                
+            elif intent.action == "GENERATE_CREATIVES":
+                from .google_ads_analysis_tools import GoogleAdsAnalysisTools
+                analysis_tools = GoogleAdsAnalysisTools(self.user, str(self.session.id) if self.session else None)
+                
+                context = intent.parameters.get("context", "")
+                results.update(analysis_tools.generate_ad_copies(context, "google_ads", 4))
+                
+            elif intent.action == "POSTER_GENERATOR":
+                from .google_ads_analysis_tools import GoogleAdsAnalysisTools
+                analysis_tools = GoogleAdsAnalysisTools(self.user, str(self.session.id) if self.session else None)
+                
+                context = intent.parameters.get("context", "")
+                target_audience = intent.parameters.get("target_audience", "students")
+                results.update(analysis_tools.generate_poster_templates(context, target_audience))
+                
+            elif intent.action == "META_ADS_CREATIVES":
+                from .google_ads_analysis_tools import GoogleAdsAnalysisTools
+                analysis_tools = GoogleAdsAnalysisTools(self.user, str(self.session.id) if self.session else None)
+                
+                context = intent.parameters.get("context", "")
+                ad_format = intent.parameters.get("ad_format", "all")
+                results.update(analysis_tools.generate_meta_ads_creatives(context, ad_format))
                 
             elif intent.action == "CHECK_CREATIVE_FATIGUE":
                 from .analysis_service import GoogleAdsAnalysisService
@@ -398,26 +657,6 @@ class ChatService:
                 comparison_type = intent.parameters.get("comparison_type", "M1_M2")
                 account_id = intent.parameters.get("account_id")
                 results["performance_comparison"] = analysis_service.compare_performance(comparison_type, account_id)
-                
-            elif intent.action == "OPTIMIZE_CAMPAIGN":
-                # Use RAG system for optimization queries
-                from .rag_service import GoogleAdsRAGService
-                from .data_service import GoogleAdsDataService
-                
-                # Get user's Google Ads data for context
-                data_service = GoogleAdsDataService(self.user)
-                account_data = data_service.get_campaign_data()
-                
-                # Initialize RAG service
-                rag_service = GoogleAdsRAGService(self.user)
-                
-                # Get hybrid response using smart context selection
-                rag_response = rag_service.get_hybrid_response("how to optimize Google Ads campaigns", account_data)
-                
-                # Store the RAG-enhanced response
-                results["rag_enhanced_response"] = rag_response
-                results["response_type"] = rag_response.get("response_type", "unknown")
-                results["rag_metadata"] = rag_response.get("rag_metadata", {})
                 
             elif intent.action == "OPTIMIZE_ADSET":
                 # Use RAG system for ad set optimization queries

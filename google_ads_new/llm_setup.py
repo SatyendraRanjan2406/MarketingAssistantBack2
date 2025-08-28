@@ -33,7 +33,7 @@ class ListBlock(BaseModel):
 class ActionBlock(BaseModel):
     type: Literal["actions"] = "actions"
     title: Optional[str] = None
-    items: List[Dict[str, str]]  # [{"id": "create_campaign", "label": "Create Campaign"}]
+    items: List[Dict[str, str]]  # [{"id": "action_id", "label": "Action Label"}]
 
 class TextBlock(BaseModel):
     type: Literal["text"] = "text"
@@ -53,32 +53,58 @@ class MetricBlock(BaseModel):
     change: Optional[str] = None
     trend: Optional[Literal["up", "down", "neutral"]] = None
 
+class DigDeeperBlock(BaseModel):
+    type: Literal["dig_deeper"] = "dig_deeper"
+    title: str
+    description: str
+    action_id: str
+    max_depth: int = 2
+    current_depth: int = 1
+
+class CreativeBlock(BaseModel):
+    type: Literal["creative"] = "creative"
+    title: str
+    description: str
+    template_type: str
+    features: List[str]
+    advantages: List[str]
+    cta_suggestions: List[str]
+    color_scheme: Optional[str] = None
+    target_audience: Optional[str] = None
+
+class WorkflowBlock(BaseModel):
+    type: Literal["workflow"] = "workflow"
+    title: str
+    steps: List[Dict[str, str]]  # [{"step": "1", "action": "Action description"}]
+    tools: List[str]
+    tips: List[str]
+
 # Union type for all block types
-UIBlock = Union[TextBlock, ChartBlock, TableBlock, ListBlock, ActionBlock, ImageBlock, MetricBlock]
+UIBlock = Union[TextBlock, ChartBlock, TableBlock, ListBlock, ActionBlock, ImageBlock, MetricBlock, DigDeeperBlock, CreativeBlock, WorkflowBlock]
 
 class UIResponse(BaseModel):
     """Complete UI response with blocks"""
     blocks: List[UIBlock]
     session_id: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    dig_deeper_context: Optional[Dict[str, Any]] = None
 
-# Intent classification schema
-class Intent(BaseModel):
-    """User intent classification"""
+# Intent classification schema for Google Ads specific use cases
+class GoogleAdsIntent(BaseModel):
+    """Google Ads specific user intent classification"""
     action: Literal[
-        "GET_OVERVIEW", "GET_CAMPAIGNS", "CREATE_CAMPAIGN", "UPDATE_CAMPAIGN",
-        "GET_ADGROUPS", "GET_ADS", "CREATE_ADGROUP", "CREATE_AD",
-        "SEARCH_KB", "SEARCH_DB", "GET_ANALYTICS", "GET_BUDGETS",
-        "PAUSE_CAMPAIGN", "RESUME_CAMPAIGN", "DELETE_CAMPAIGN",
-        "GET_PERFORMANCE", "GET_KEYWORDS", "ADD_KB_DOCUMENT",
-        "GENERATE_IMAGES", "CREATE_DYNAMIC_AD", "GET_CREATIVE_SUGGESTIONS"
+        "CAMPAIGN_SUMMARY_COMPARISON", "PERFORMANCE_SUMMARY", "TREND_ANALYSIS",
+        "LISTING_ANALYSIS", "QUERY_WITHOUT_SOLUTION", "PIE_CHART_DISPLAY",
+        "DUPLICATE_KEYWORDS_ANALYSIS", "DIG_DEEPER_ANALYSIS", "GENERATE_AD_COPIES",
+        "GENERATE_CREATIVES", "POSTER_GENERATOR", "META_ADS_CREATIVES"
     ]
     confidence: float = Field(ge=0.0, le=1.0)
     parameters: Dict[str, Any] = Field(default_factory=dict)
     requires_auth: bool = True
+    dig_deeper_depth: int = Field(default=1, ge=1, le=3)
 
 class LLMSetup:
-    """LangChain LLM setup and configuration"""
+    """LangChain LLM setup and configuration for Google Ads chatbot"""
     
     def __init__(self):
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
@@ -93,58 +119,60 @@ class LLMSetup:
         )
         
         # Create structured output parsers
-        self.intent_parser = JsonOutputParser(pydantic_object=Intent)
+        self.intent_parser = JsonOutputParser(pydantic_object=GoogleAdsIntent)
         self.ui_parser = JsonOutputParser(pydantic_object=UIResponse)
         
-        # System prompts
+        # Google Ads specific intent prompt
         self.intent_prompt = ChatPromptTemplate.from_template("""
-        You are an AI assistant that helps users manage Google Ads campaigns. 
+        You are an AI assistant that helps users analyze Google Ads campaigns and performance data, and generate ad copies and creatives.
         Classify the user's intent from their message.
         
         User message: {user_message}
         
-        Available actions:
-        - GET_OVERVIEW: Get account overview and summary
-        - GET_CAMPAIGNS: Retrieve campaign information
-        - CREATE_CAMPAIGN: Create new campaigns
-        - UPDATE_CAMPAIGN: Modify existing campaigns
-        - GET_ADGROUPS: Get ad group information
-        - GET_ADS: Get ad information
-        - CREATE_ADGROUP: Create new ad groups
-        - CREATE_AD: Create new ads (including with images)
-        - GENERATE_IMAGES: Generate AI images for products using DALL-E
-        - CREATE_DYNAMIC_AD: Create ads with AI-generated creative suggestions
-        - GET_CREATIVE_SUGGESTIONS: Get AI-powered creative suggestions for ads
-        - SEARCH_KB: Search company knowledge base
-        - SEARCH_DB: Search local database
-        - GET_ANALYTICS: Get performance analytics
-        - GET_BUDGETS: Get budget information
-        - PAUSE_CAMPAIGN: Pause campaigns
-        - RESUME_CAMPAIGN: Resume campaigns
-        - DELETE_CAMPAIGN: Delete campaigns
-        - GET_PERFORMANCE: Get performance data
-        - GET_KEYWORDS: Get keyword information
-        - ADD_KB_DOCUMENT: Add document to knowledge base
+        Available Google Ads analysis and creative actions:
+        - CAMPAIGN_SUMMARY_COMPARISON: Compare campaigns, ad groups, adsets, ads for key metrics and sorting
+        - PERFORMANCE_SUMMARY: Show performance summary in tables with key insights and recommendations
+        - TREND_ANALYSIS: Display trends using line graphs or bar graphs for metrics like clicks, CPC, CTR
+        - LISTING_ANALYSIS: Show listings in tables with additional key insights based on data
+        - QUERY_WITHOUT_SOLUTION: Handle queries that have no solution by prompting user in right direction
+        - PIE_CHART_DISPLAY: Display data in pie charts when requested
+        - DUPLICATE_KEYWORDS_ANALYSIS: Analyze duplicate keywords across campaigns and provide consolidation recommendations
+        - DIG_DEEPER_ANALYSIS: Handle follow-up analysis requests with hierarchical depth tracking
+        - GENERATE_AD_COPIES: Generate multiple ad copy variations for Google Ads
+        - GENERATE_CREATIVES: Generate creative ideas and designs for ads
+        - POSTER_GENERATOR: Generate poster templates and design suggestions
+        - META_ADS_CREATIVES: Generate creative ideas specifically for Meta/Facebook ads
         
-        IMPORTANT: 
-        - If user mentions "images", "photos", "pictures", "visuals" → use GENERATE_IMAGES
-        - If user mentions "creative", "suggestions", "ideas" → use GET_CREATIVE_SUGGESTIONS
-        - If user mentions "create ad" with images → use CREATE_AD
-        - If user mentions "share images" → use GENERATE_IMAGES
+        INTENT DETECTION RULES:
+        - If user asks to "compare", "sort", "analyze" campaigns → CAMPAIGN_SUMMARY_COMPARISON
+        - If user asks for "performance summary", "metrics", "ROAS" → PERFORMANCE_SUMMARY
+        - If user asks for "trends", "daily trends", "graphs" → TREND_ANALYSIS
+        - If user asks for "top 10", "list", "ranking" → LISTING_ANALYSIS
+        - If user asks for "quality score", "account-level" metrics not available → QUERY_WITHOUT_SOLUTION
+        - If user asks for "pie chart", "spend distribution" → PIE_CHART_DISPLAY
+        - If user asks for "duplicate keywords", "consolidation" → DUPLICATE_KEYWORDS_ANALYSIS
+        - If user says "dig deeper", "more details", "expand" → DIG_DEEPER_ANALYSIS
+        - If user asks for "ad copies", "ad variations", "copywriting" → GENERATE_AD_COPIES
+        - If user asks for "creative ideas", "design suggestions", "visual concepts" → GENERATE_CREATIVES
+        - If user asks for "poster", "flyer", "banner" design → POSTER_GENERATOR
+        - If user asks for "Facebook ads", "Meta ads", "social media creatives" → META_ADS_CREATIVES
         
         Return a JSON object with:
-        - action: the detected action
+        - action: the detected Google Ads analysis or creative action
         - confidence: confidence score (0.0 to 1.0)
         - parameters: any relevant parameters from the user message
         - requires_auth: whether this action requires Google Ads authentication
+        - dig_deeper_depth: current depth level (1-3, default 1)
         """)
         
+        # Enhanced UI prompt for Google Ads specific responses including creative generation
         self.ui_prompt = ChatPromptTemplate.from_template("""
-        You are an AI assistant that creates rich UI responses for a Google Ads management application.
+        You are an AI assistant that creates rich UI responses for a Google Ads analysis and creative generation application.
         Convert the given information into UI blocks that can be rendered in React.
         
         Information: {information}
         User query: {user_query}
+        Dig deeper context: {dig_deeper_context}
         
         IMPORTANT: You MUST use ONLY these exact block types with correct structure:
         
@@ -170,39 +198,118 @@ class LLMSetup:
            {{"type": "metric", "title": "Metric Title", "value": "100", "change": "+5%", "trend": "up"}}
            Trends: "up", "down", "neutral"
         
+        7. DIG DEEPER BLOCK (type: "dig_deeper"):
+           {{"type": "dig_deeper", "title": "Dig Deeper", "description": "Get more detailed analysis", "action_id": "dig_deeper_action", "max_depth": 2, "current_depth": 1}}
+        
+        8. CREATIVE BLOCK (type: "creative"):
+           {{"type": "creative", "title": "Creative Title", "description": "Description", "template_type": "Type", "features": ["Feature 1", "Feature 2"], "advantages": ["Advantage 1"], "cta_suggestions": ["CTA 1"], "color_scheme": "Scheme", "target_audience": "Audience"}}
+        
+        9. WORKFLOW BLOCK (type: "workflow"):
+           {{"type": "workflow", "title": "Workflow Title", "steps": [{{"step": "1", "action": "Action description"}}], "tools": ["Tool 1"], "tips": ["Tip 1"]}}
+        
+        GOOGLE ADS RESPONSE PATTERNS:
+        
+        For CAMPAIGN_SUMMARY_COMPARISON:
+        - Start with TextBlock with summary and key insights
+        - Add TableBlock with campaign comparison data
+        - Include DigDeeperBlock for "Dig Deeper" action
+        - Add ActionBlock with relevant next steps
+        
+        For PERFORMANCE_SUMMARY:
+        - Start with TextBlock with key insights
+        - Add TableBlock with performance metrics
+        - Include recommendations in TextBlock
+        - Add ActionBlock with optimization actions
+        
+        For TREND_ANALYSIS:
+        - Start with TextBlock explaining trends
+        - Add ChartBlock with line/bar charts
+        - Include insights in TextBlock
+        - Add ActionBlock for further analysis
+        
+        For LISTING_ANALYSIS:
+        - Start with TextBlock with summary
+        - Add TableBlock with listing data
+        - Include key insights in TextBlock
+        - Add ActionBlock for next steps
+        
+        For QUERY_WITHOUT_SOLUTION:
+        - Start with TextBlock explaining the limitation
+        - Provide alternative suggestions in TextBlock
+        - Add ActionBlock with available alternatives
+        
+        For PIE_CHART_DISPLAY:
+        - Start with TextBlock explaining the data
+        - Add ChartBlock with pie chart
+        - Include insights in TextBlock
+        
+        For DUPLICATE_KEYWORDS_ANALYSIS:
+        - Start with TextBlock with summary
+        - Add TableBlock with duplicate keywords
+        - Include recommendations in TextBlock
+        - Add ActionBlock for consolidation steps
+        
+        For GENERATE_AD_COPIES:
+        - Start with TextBlock explaining the ad copy strategy
+        - Add multiple TextBlocks for each ad copy variation
+        - Include CreativeBlock for design suggestions
+        - Add ActionBlock for next steps
+        
+        For GENERATE_CREATIVES:
+        - Start with TextBlock with creative concept overview
+        - Add multiple CreativeBlocks for different creative ideas
+        - Include WorkflowBlock for implementation steps
+        - Add ActionBlock for design tools
+        
+        For POSTER_GENERATOR:
+        - Start with TextBlock with poster concept overview
+        - Add multiple CreativeBlocks for poster templates
+        - Include WorkflowBlock for creation steps
+        - Add ActionBlock for design tools and next steps
+        
+        For META_ADS_CREATIVES:
+        - Start with TextBlock with Meta ads strategy
+        - Add multiple CreativeBlocks for different ad formats
+        - Include WorkflowBlock for Meta ads implementation
+        - Add ActionBlock for Meta ads tools
+        
         CRITICAL RULES:
         - Use EXACTLY these block types and field names
-        - Never use types like "list", "button", "metrics", "barChart", "lineChart"
-        - Always include required fields for each block type
+        - Always include a DigDeeperBlock for analysis responses (max_depth: 2, current_depth: 1)
         - For charts, use "chart_type" not "kind" or other variations
         - For tables, use "columns" and "rows" arrays
+        - Limit DigDeeperBlock to maximum depth of 2 levels
+        - For creative generation, always include WorkflowBlock with implementation steps
+        - Include multiple CreativeBlocks to show variety and options
         
         Return a JSON object with a "blocks" array containing the UI blocks.
         """)
     
-    def classify_intent(self, user_message: str) -> Intent:
-        """Classify user intent from message"""
+    def classify_intent(self, user_message: str) -> GoogleAdsIntent:
+        """Classify user intent from message for Google Ads analysis and creative generation"""
         try:
             chain = self.intent_prompt | self.llm | self.intent_parser
             result = chain.invoke({"user_message": user_message})
-            return Intent(**result)
+            return GoogleAdsIntent(**result)
         except Exception as e:
             logger.error(f"Error classifying intent: {e}")
             # Fallback to default intent
-            return Intent(
-                action="GET_OVERVIEW",
+            return GoogleAdsIntent(
+                action="CAMPAIGN_SUMMARY_COMPARISON",
                 confidence=0.5,
                 parameters={},
-                requires_auth=False
+                requires_auth=False,
+                dig_deeper_depth=1
             )
     
-    def generate_ui_response(self, information: Dict[str, Any], user_query: str) -> UIResponse:
-        """Generate UI response blocks from information"""
+    def generate_ui_response(self, information: Dict[str, Any], user_query: str, dig_deeper_context: Dict[str, Any] = None) -> UIResponse:
+        """Generate UI response blocks from information with dig deeper and creative support"""
         try:
             chain = self.ui_prompt | self.llm | self.ui_parser
             result = chain.invoke({
                 "information": str(information),
-                "user_query": user_query
+                "user_query": user_query,
+                "dig_deeper_context": str(dig_deeper_context) if dig_deeper_context else "None"
             })
             return UIResponse(**result)
         except Exception as e:
@@ -235,6 +342,15 @@ class LLMSetup:
                             rows=rows
                         ))
                 
+                # Add Dig Deeper block
+                blocks.append(DigDeeperBlock(
+                    title="Dig Deeper",
+                    description="Get more detailed analysis of this data",
+                    action_id="dig_deeper_analysis",
+                    max_depth=2,
+                    current_depth=1
+                ))
+                
                 # Add action buttons for common next steps
                 blocks.append(ActionBlock(
                     items=[
@@ -250,12 +366,15 @@ class LLMSetup:
                         {"id": "optimize_campaign", "label": "Optimize Campaign"},
                         {"id": "set_budget", "label": "Set Budget"},
                         {"id": "get_performance", "label": "View Performance"},
+                        {"id": "generate_ad_copies", "label": "Generate Ad Copies"},
+                        {"id": "create_posters", "label": "Create Posters"},
+                        {"id": "meta_ads_creatives", "label": "Meta Ads Creatives"},
                         {"id": "retry_action", "label": "Retry Action"},
                         {"id": "contact_support", "label": "Contact Support"}
                     ]
                 ))
                 
-                return UIResponse(blocks=blocks)
+                return UIResponse(blocks=blocks, dig_deeper_context=dig_deeper_context)
                 
             except Exception as fallback_error:
                 logger.error(f"Fallback response generation failed: {fallback_error}")
@@ -266,7 +385,8 @@ class LLMSetup:
                             content=f"Here's what I found: {str(information)}",
                             style="paragraph"
                         )
-                    ]
+                    ],
+                    dig_deeper_context=dig_deeper_context
                 )
 
 # Initialize LLM setup

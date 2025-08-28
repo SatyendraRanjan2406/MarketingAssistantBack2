@@ -1,0 +1,15 @@
+.env
+.env.backup
+.env.backup.*
+google_ads_credentials.json
+google_ads_credentials_backup.json
+*credentials*.json
+*token*.json
+*secret*.json
+*key*.json
+*api*.json
+*config*.json
+*.pem
+*.key
+*.crt
+*.p12

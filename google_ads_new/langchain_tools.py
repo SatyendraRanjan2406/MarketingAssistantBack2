@@ -2504,6 +2504,859 @@ class AnalyticsTools:
             return {"error": f"Failed to get budget insights: {str(e)}"}
 
 
+class GoogleAdsAnalysisTools:
+    """Generic tools for Google Ads analysis and reporting"""
+    
+    def __init__(self, user: User, session_id: str = None):
+        self.user = user
+        self.session_id = session_id
+        self.auth_service = UserGoogleAuthService()
+    
+    def _get_google_ads_credentials(self) -> Dict[str, str]:
+        """Get Google Ads API credentials for the user"""
+        try:
+            # Get user's Google OAuth tokens
+            user_auth = self.user.google_auth_set.first()
+            if not user_auth:
+                return {"error": "User not authenticated with Google"}
+            
+            # Get developer token from environment
+            developer_token = os.getenv('GOOGLE_ADS_DEVELOPER_TOKEN')
+            if not developer_token:
+                return {"error": "Google Ads developer token not configured"}
+            
+            # Try to get customer ID from Google Ads accounts
+            customer_id = user_auth.google_ads_customer_id or user_auth.google_user_id
+            
+            # If we have a proper Google Ads customer ID from local accounts, use that
+            accounts = GoogleAdsAccount.objects.filter(
+                user=self.user,
+                is_active=True
+            ).first()
+            
+            if accounts and accounts.customer_id:
+                customer_id = accounts.customer_id
+            
+            return {
+                "access_token": user_auth.access_token,
+                "developer_token": developer_token,
+                "customer_id": customer_id
+            }
+        except Exception as e:
+            logger.error(f"Error getting Google Ads credentials: {e}")
+            return {"error": f"Failed to get credentials: {str(e)}"}
+    
+    def _log_tool_execution(self, tool_name: str, input_params: Dict, output_result: Dict, 
+                           execution_time_ms: int, success: bool, error_message: str = None):
+        """Log tool execution for auditing"""
+        try:
+            if self.session_id:
+                session = ChatSession.objects.get(id=self.session_id)
+                AIToolExecution.objects.create(
+                    user=self.user,
+                    session=session,
+                    tool_type='google_ads_analysis',
+                    tool_name=tool_name,
+                    input_parameters=input_params,
+                    output_result=output_result,
+                    execution_time_ms=execution_time_ms,
+                    success=success,
+                    error_message=error_message
+                )
+        except Exception as e:
+            logger.error(f"Failed to log tool execution: {e}")
+    
+    def analyze_campaign_summary_comparison(self, sort_by: str = "spend", limit: int = 10) -> Dict[str, Any]:
+        """Analyze and compare campaigns for key metrics and sorting"""
+        start_time = time.time()
+        try:
+            # Get campaign data from local database
+            campaigns = GoogleAdsCampaign.objects.filter(
+                account__user=self.user,
+                account__is_active=True
+            ).select_related('account')
+            
+            if not campaigns.exists():
+                return {"error": "No campaigns found for analysis"}
+            
+            # Get performance data
+            campaign_data = []
+            for campaign in campaigns:
+                performance = GoogleAdsPerformance.objects.filter(
+                    campaign=campaign
+                ).aggregate(
+                    total_impressions=Sum('impressions'),
+                    total_clicks=Sum('clicks'),
+                    total_cost=Sum('cost'),
+                    total_conversions=Sum('conversions')
+                )
+                
+                if performance['total_impressions']:
+                    ctr = (performance['total_clicks'] / performance['total_impressions']) * 100
+                    cpc = performance['total_cost'] / performance['total_clicks'] if performance['total_clicks'] > 0 else 0
+                    conversion_rate = (performance['total_conversions'] / performance['total_clicks']) * 100 if performance['total_clicks'] > 0 else 0
+                    cost_per_conversion = performance['total_cost'] / performance['total_conversions'] if performance['total_conversions'] > 0 else 0
+                    
+                    campaign_data.append({
+                        "campaign_name": campaign.campaign_name,
+                        "campaign_status": campaign.status,
+                        "impressions": performance['total_impressions'],
+                        "clicks": performance['total_clicks'],
+                        "cost": float(performance['total_cost']),
+                        "conversions": performance['total_conversions'],
+                        "ctr": round(ctr, 2),
+                        "cpc": round(float(cpc), 2),
+                        "conversion_rate": round(conversion_rate, 2),
+                        "cost_per_conversion": round(float(cost_per_conversion), 2)
+                    })
+            
+            # Sort by specified metric
+            if sort_by == "spend":
+                campaign_data.sort(key=lambda x: x['cost'], reverse=True)
+            elif sort_by == "clicks":
+                campaign_data.sort(key=lambda x: x['clicks'], reverse=True)
+            elif sort_by == "conversions":
+                campaign_data.sort(key=lambda x: x['conversions'], reverse=True)
+            elif sort_by == "ctr":
+                campaign_data.sort(key=lambda x: x['ctr'], reverse=True)
+            
+            # Limit results
+            campaign_data = campaign_data[:limit]
+            
+            # Calculate summary metrics
+            total_spend = sum(c['cost'] for c in campaign_data)
+            total_clicks = sum(c['clicks'] for c in campaign_data)
+            total_impressions = sum(c['impressions'] for c in campaign_data)
+            total_conversions = sum(c['conversions'] for c in campaign_data)
+            
+            overall_ctr = (total_clicks / total_impressions) * 100 if total_impressions > 0 else 0
+            overall_cpc = total_spend / total_clicks if total_clicks > 0 else 0
+            overall_conversion_rate = (total_conversions / total_clicks) * 100 if total_clicks > 0 else 0
+            
+            result = {
+                "campaigns": campaign_data,
+                "summary": {
+                    "total_campaigns": len(campaign_data),
+                    "total_spend": round(total_spend, 2),
+                    "total_clicks": total_clicks,
+                    "total_impressions": total_impressions,
+                    "total_conversions": total_conversions,
+                    "overall_ctr": round(overall_ctr, 2),
+                    "overall_cpc": round(overall_cpc, 2),
+                    "overall_conversion_rate": round(overall_conversion_rate, 2)
+                },
+                "sort_by": sort_by,
+                "analysis_type": "campaign_summary_comparison"
+            }
+            
+            execution_time = int((time.time() - start_time) * 1000)
+            self._log_tool_execution("analyze_campaign_summary_comparison", 
+                                   {"sort_by": sort_by, "limit": limit}, 
+                                   result, execution_time, True)
+            
+            return result
+            
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            error_msg = f"Error analyzing campaign summary: {str(e)}"
+            self._log_tool_execution("analyze_campaign_summary_comparison", 
+                                   {"sort_by": sort_by, "limit": limit}, 
+                                   {}, execution_time, False, error_msg)
+            return {"error": error_msg}
+    
+    def analyze_performance_summary(self, days: int = 30) -> Dict[str, Any]:
+        """Generate performance summary with key insights and recommendations"""
+        start_time = time.time()
+        try:
+            # Calculate date range
+            end_date = timezone.now().date()
+            start_date = end_date - timezone.timedelta(days=days)
+            
+            # Get performance data for the period
+            performance_data = GoogleAdsPerformance.objects.filter(
+                campaign__account__user=self.user,
+                campaign__account__is_active=True,
+                date__gte=start_date,
+                date__lte=end_date
+            ).select_related('campaign', 'campaign__account')
+            
+            if not performance_data.exists():
+                return {"error": f"No performance data found for the last {days} days"}
+            
+            # Aggregate daily performance
+            daily_performance = {}
+            for perf in performance_data:
+                date_str = perf.date.strftime('%Y-%m-%d')
+                if date_str not in daily_performance:
+                    daily_performance[date_str] = {
+                        "impressions": 0,
+                        "clicks": 0,
+                        "cost": 0,
+                        "conversions": 0
+                    }
+                
+                daily_performance[date_str]["impressions"] += perf.impressions or 0
+                daily_performance[date_str]["clicks"] += perf.clicks or 0
+                daily_performance[date_str]["cost"] += float(perf.cost or 0)
+                daily_performance[date_str]["conversions"] += perf.conversions or 0
+            
+            # Convert to sorted list
+            daily_data = []
+            for date_str, data in sorted(daily_performance.items()):
+                ctr = (data["clicks"] / data["impressions"]) * 100 if data["impressions"] > 0 else 0
+                cpc = data["cost"] / data["clicks"] if data["clicks"] > 0 else 0
+                
+                daily_data.append({
+                    "date": date_str,
+                    "impressions": data["impressions"],
+                    "clicks": data["clicks"],
+                    "cost": round(data["cost"], 2),
+                    "conversions": data["conversions"],
+                    "ctr": round(ctr, 2),
+                    "cpc": round(cpc, 2)
+                })
+            
+            # Calculate totals
+            total_impressions = sum(d["impressions"] for d in daily_data)
+            total_clicks = sum(d["clicks"] for d in daily_data)
+            total_cost = sum(d["cost"] for d in daily_data)
+            total_conversions = sum(d["conversions"] for d in daily_data)
+            
+            overall_ctr = (total_clicks / total_impressions) * 100 if total_impressions > 0 else 0
+            overall_cpc = total_cost / total_clicks if total_clicks > 0 else 0
+            overall_conversion_rate = (total_conversions / total_clicks) * 100 if total_clicks > 0 else 0
+            cost_per_conversion = total_cost / total_conversions if total_conversions > 0 else 0
+            
+            # Generate insights
+            insights = []
+            if total_conversions == 0:
+                insights.append("No conversions recorded - investigate conversion tracking setup")
+            
+            if overall_cpc > 100:  # Assuming high CPC threshold
+                insights.append("High average CPC indicates potential bidding inefficiencies")
+            
+            if overall_ctr < 1:  # Assuming low CTR threshold
+                insights.append("Low CTR suggests ad relevance or targeting issues")
+            
+            # Find best and worst performing days
+            if daily_data:
+                best_day = max(daily_data, key=lambda x: x["clicks"])
+                worst_day = min(daily_data, key=lambda x: x["clicks"])
+                insights.append(f"Best performing day: {best_day['date']} with {best_day['clicks']} clicks")
+                insights.append(f"Lowest performing day: {worst_day['date']} with {worst_day['clicks']} clicks")
+            
+            result = {
+                "daily_performance": daily_data,
+                "summary": {
+                    "period_days": days,
+                    "total_impressions": total_impressions,
+                    "total_clicks": total_clicks,
+                    "total_cost": round(total_cost, 2),
+                    "total_conversions": total_conversions,
+                    "overall_ctr": round(overall_ctr, 2),
+                    "overall_cpc": round(overall_cpc, 2),
+                    "overall_conversion_rate": round(overall_conversion_rate, 2),
+                    "cost_per_conversion": round(cost_per_conversion, 2)
+                },
+                "insights": insights,
+                "analysis_type": "performance_summary"
+            }
+            
+            execution_time = int((time.time() - start_time) * 1000)
+            self._log_tool_execution("analyze_performance_summary", 
+                                   {"days": days}, 
+                                   result, execution_time, True)
+            
+            return result
+            
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            error_msg = f"Error analyzing performance summary: {str(e)}"
+            self._log_tool_execution("analyze_performance_summary", 
+                                   {"days": days}, 
+                                   {}, execution_time, False, error_msg)
+            return {"error": error_msg}
+    
+    def analyze_trends(self, metric: str = "clicks", days: int = 30) -> Dict[str, Any]:
+        """Analyze trends for specified metrics using line/bar charts"""
+        start_time = time.time()
+        try:
+            # Calculate date range
+            end_date = timezone.now().date()
+            start_date = end_date - timezone.timedelta(days=days)
+            
+            # Get performance data for the period
+            performance_data = GoogleAdsPerformance.objects.filter(
+                campaign__account__user=self.user,
+                campaign__account__is_active=True,
+                date__gte=start_date,
+                date__lte=end_date
+            ).select_related('campaign')
+            
+            if not performance_data.exists():
+                return {"error": f"No trend data found for the last {days} days"}
+            
+            # Aggregate daily metrics
+            daily_metrics = {}
+            for perf in performance_data:
+                date_str = perf.date.strftime('%Y-%m-%d')
+                if date_str not in daily_metrics:
+                    daily_metrics[date_str] = {
+                        "impressions": 0,
+                        "clicks": 0,
+                        "cost": 0,
+                        "conversions": 0
+                    }
+                
+                daily_metrics[date_str]["impressions"] += perf.impressions or 0
+                daily_metrics[date_str]["clicks"] += perf.clicks or 0
+                daily_metrics[date_str]["cost"] += float(perf.cost or 0)
+                daily_metrics[date_str]["conversions"] += perf.conversions or 0
+            
+            # Calculate derived metrics
+            for date_str in daily_metrics:
+                data = daily_metrics[date_str]
+                if data["impressions"] > 0:
+                    data["ctr"] = round((data["clicks"] / data["impressions"]) * 100, 2)
+                else:
+                    data["ctr"] = 0
+                
+                if data["clicks"] > 0:
+                    data["cpc"] = round(data["cost"] / data["clicks"], 2)
+                else:
+                    data["cpc"] = 0
+            
+            # Sort by date and prepare chart data
+            sorted_dates = sorted(daily_metrics.keys())
+            chart_data = {
+                "labels": sorted_dates,
+                "datasets": []
+            }
+            
+            # Add requested metric dataset
+            if metric == "clicks":
+                chart_data["datasets"].append({
+                    "label": "Daily Clicks",
+                    "data": [daily_metrics[date]["clicks"] for date in sorted_dates]
+                })
+            elif metric == "cpc":
+                chart_data["datasets"].append({
+                    "label": "Daily CPC",
+                    "data": [daily_metrics[date]["cpc"] for date in sorted_dates]
+                })
+            elif metric == "ctr":
+                chart_data["datasets"].append({
+                    "label": "Daily CTR (%)",
+                    "data": [daily_metrics[date]["ctr"] for date in sorted_dates]
+                })
+            elif metric == "all":
+                chart_data["datasets"] = [
+                    {
+                        "label": "Daily Clicks",
+                        "data": [daily_metrics[date]["clicks"] for date in sorted_dates]
+                    },
+                    {
+                        "label": "Daily CPC",
+                        "data": [daily_metrics[date]["cpc"] for date in sorted_dates]
+                    },
+                    {
+                        "label": "Daily CTR (%)",
+                        "data": [daily_metrics[date]["ctr"] for date in sorted_dates]
+                    }
+                ]
+            
+            # Generate insights
+            insights = []
+            if len(sorted_dates) > 1:
+                first_value = chart_data["datasets"][0]["data"][0]
+                last_value = chart_data["datasets"][0]["data"][-1]
+                
+                if last_value > first_value:
+                    trend = "increasing"
+                    change_percent = ((last_value - first_value) / first_value) * 100 if first_value > 0 else 0
+                    insights.append(f"{metric.upper()} trend is {trend} by {round(change_percent, 1)}% over the period")
+                elif last_value < first_value:
+                    trend = "decreasing"
+                    change_percent = ((first_value - last_value) / first_value) * 100 if first_value > 0 else 0
+                    insights.append(f"{metric.upper()} trend is {trend} by {round(change_percent, 1)}% over the period")
+                else:
+                    insights.append(f"{metric.upper()} trend is stable over the period")
+            
+            result = {
+                "chart_data": chart_data,
+                "metric": metric,
+                "period_days": days,
+                "insights": insights,
+                "analysis_type": "trend_analysis"
+            }
+            
+            execution_time = int((time.time() - start_time) * 1000)
+            self._log_tool_execution("analyze_trends", 
+                                   {"metric": metric, "days": days}, 
+                                   result, execution_time, True)
+            
+            return result
+            
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            error_msg = f"Error analyzing trends: {str(e)}"
+            self._log_tool_execution("analyze_trends", 
+                                   {"metric": metric, "days": days}, 
+                                   {}, execution_time, False, error_msg)
+            return {"error": error_msg}
+    
+    def analyze_listing_performance(self, listing_type: str = "campaigns", limit: int = 10, 
+                                  sort_by: str = "conversions", days: int = 14) -> Dict[str, Any]:
+        """Analyze top performing items (campaigns, keywords, etc.) with insights"""
+        start_time = time.time()
+        try:
+            # Calculate date range
+            end_date = timezone.now().date()
+            start_date = end_date - timezone.timedelta(days=days)
+            
+            if listing_type == "campaigns":
+                # Get top campaigns by performance
+                campaigns = GoogleAdsCampaign.objects.filter(
+                    account__user=self.user,
+                    account__is_active=True
+                )
+                
+                campaign_performance = []
+                for campaign in campaigns:
+                    performance = GoogleAdsPerformance.objects.filter(
+                        campaign=campaign,
+                        date__gte=start_date,
+                        date__lte=end_date
+                    ).aggregate(
+                        total_impressions=Sum('impressions'),
+                        total_clicks=Sum('clicks'),
+                        total_cost=Sum('cost'),
+                        total_conversions=Sum('conversions')
+                    )
+                    
+                    if performance['total_impressions']:
+                        ctr = (performance['total_clicks'] / performance['total_impressions']) * 100
+                        cpc = performance['total_cost'] / performance['total_clicks'] if performance['total_clicks'] > 0 else 0
+                        conversion_rate = (performance['total_conversions'] / performance['total_clicks']) * 100 if performance['total_clicks'] > 0 else 0
+                        cost_per_conversion = performance['total_cost'] / performance['total_conversions'] if performance['total_conversions'] > 0 else 0
+                        
+                        campaign_performance.append({
+                            "campaign_name": campaign.campaign_name,
+                            "impressions": performance['total_impressions'],
+                            "clicks": performance['total_clicks'],
+                            "ctr": round(ctr, 2),
+                            "avg_cpc": round(float(cpc), 2),
+                            "total_cost": round(float(performance['total_cost']), 2),
+                            "conversions": performance['total_conversions'],
+                            "conversion_rate": round(conversion_rate, 2),
+                            "cost_per_conversion": round(float(cost_per_conversion), 2)
+                        })
+                
+                # Sort by specified metric
+                if sort_by == "conversions":
+                    campaign_performance.sort(key=lambda x: x['conversions'], reverse=True)
+                elif sort_by == "clicks":
+                    campaign_performance.sort(key=lambda x: x['clicks'], reverse=True)
+                elif sort_by == "spend":
+                    campaign_performance.sort(key=lambda x: x['total_cost'], reverse=True)
+                elif sort_by == "ctr":
+                    campaign_performance.sort(key=lambda x: x['ctr'], reverse=True)
+                
+                # Limit results
+                campaign_performance = campaign_performance[:limit]
+                
+                # Generate insights
+                insights = []
+                if campaign_performance:
+                    top_campaign = campaign_performance[0]
+                    insights.append(f"Top performer: '{top_campaign['campaign_name']}' with {top_campaign['conversions']} conversions")
+                    
+                    if top_campaign['cost_per_conversion'] > 100:  # Assuming high cost threshold
+                        insights.append(f"High cost per conversion (₹{top_campaign['cost_per_conversion']}) suggests optimization needed")
+                    
+                    avg_ctr = sum(c['ctr'] for c in campaign_performance) / len(campaign_performance)
+                    insights.append(f"Average CTR across top campaigns: {round(avg_ctr, 2)}%")
+                
+                result = {
+                    "listing_type": listing_type,
+                    "items": campaign_performance,
+                    "sort_by": sort_by,
+                    "period_days": days,
+                    "insights": insights,
+                    "analysis_type": "listing_analysis"
+                }
+            
+            else:
+                return {"error": f"Listing type '{listing_type}' not supported yet"}
+            
+            execution_time = int((time.time() - start_time) * 1000)
+            self._log_tool_execution("analyze_listing_performance", 
+                                   {"listing_type": listing_type, "limit": limit, "sort_by": sort_by, "days": days}, 
+                                   result, execution_time, True)
+            
+            return result
+            
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            error_msg = f"Error analyzing listing performance: {str(e)}"
+            self._log_tool_execution("analyze_listing_performance", 
+                                   {"listing_type": listing_type, "limit": limit, "sort_by": sort_by, "days": days}, 
+                                   {}, execution_time, False, error_msg)
+            return {"error": error_msg}
+    
+    def handle_query_without_solution(self, query: str) -> Dict[str, Any]:
+        """Handle queries that don't have direct solutions by providing alternatives"""
+        start_time = time.time()
+        try:
+            # Analyze the query to understand what the user is asking for
+            query_lower = query.lower()
+            
+            alternatives = []
+            explanation = ""
+            
+            if "quality score" in query_lower and "account" in query_lower:
+                explanation = "Google Ads doesn't provide a direct 'quality score' metric at the account level. Quality scores are assigned to keywords, not entire accounts."
+                alternatives = [
+                    "Show general account performance metrics for the last 30 days",
+                    "Provide keyword-level quality scores for specific keywords",
+                    "Display quality-related metrics like CTR, conversion rates, or impression share"
+                ]
+            
+            elif "account-level" in query_lower:
+                explanation = "Many Google Ads metrics are campaign, ad group, or keyword specific rather than account-wide."
+                alternatives = [
+                    "Show campaign-level performance metrics",
+                    "Provide ad group performance analysis",
+                    "Display keyword performance data"
+                ]
+            
+            else:
+                explanation = "This query doesn't have a direct solution in Google Ads. Let me suggest some alternatives that might be helpful."
+                alternatives = [
+                    "View campaign performance summary",
+                    "Analyze keyword performance",
+                    "Check ad group metrics",
+                    "Review account overview"
+                ]
+            
+            result = {
+                "query": query,
+                "explanation": explanation,
+                "alternatives": alternatives,
+                "analysis_type": "query_without_solution"
+            }
+            
+            execution_time = int((time.time() - start_time) * 1000)
+            self._log_tool_execution("handle_query_without_solution", 
+                                   {"query": query}, 
+                                   result, execution_time, True)
+            
+            return result
+            
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            error_msg = f"Error handling query without solution: {str(e)}"
+            self._log_tool_execution("handle_query_without_solution", 
+                                   {"query": query}, 
+                                   {}, execution_time, False, error_msg)
+            return {"error": error_msg}
+    
+    def analyze_pie_chart_data(self, chart_type: str = "spend", days: int = 30) -> Dict[str, Any]:
+        """Generate pie chart data for spend distribution or other metrics"""
+        start_time = time.time()
+        try:
+            # Calculate date range
+            end_date = timezone.now().date()
+            start_date = end_date - timezone.timedelta(days=days)
+            
+            if chart_type == "spend":
+                # Get campaign spend distribution
+                campaigns = GoogleAdsCampaign.objects.filter(
+                    account__user=self.user,
+                    account__is_active=True
+                )
+                
+                campaign_spend = []
+                for campaign in campaigns:
+                    total_spend = GoogleAdsPerformance.objects.filter(
+                        campaign=campaign,
+                        date__gte=start_date,
+                        date__lte=end_date
+                    ).aggregate(total_cost=Sum('cost'))['total_cost'] or 0
+                    
+                    if total_spend > 0:
+                        campaign_spend.append({
+                            "label": campaign.campaign_name,
+                            "value": float(total_spend)
+                        })
+                
+                # Sort by spend and limit to top 10
+                campaign_spend.sort(key=lambda x: x['value'], reverse=True)
+                campaign_spend = campaign_spend[:10]
+                
+                # Calculate total spend
+                total_spend = sum(item['value'] for item in campaign_spend)
+                
+                # Calculate percentages
+                for item in campaign_spend:
+                    item['percentage'] = round((item['value'] / total_spend) * 100, 1)
+                
+                chart_data = {
+                    "labels": [item['label'] for item in campaign_spend],
+                    "datasets": [{
+                        "label": "Campaign Spend",
+                        "data": [item['value'] for item in campaign_spend]
+                    }]
+                }
+                
+                insights = [
+                    f"Total spend across campaigns: ₹{total_spend:,.2f}",
+                    f"Top campaign: {campaign_spend[0]['label']} with {campaign_spend[0]['percentage']}% of total spend"
+                ]
+                
+                if len(campaign_spend) > 1:
+                    insights.append(f"Bottom campaign: {campaign_spend[-1]['label']} with {campaign_spend[-1]['percentage']}% of total spend")
+            
+            else:
+                return {"error": f"Chart type '{chart_type}' not supported yet"}
+            
+            result = {
+                "chart_data": chart_data,
+                "chart_type": "pie",
+                "metric": chart_type,
+                "period_days": days,
+                "insights": insights,
+                "analysis_type": "pie_chart_display"
+            }
+            
+            execution_time = int((time.time() - start_time) * 1000)
+            self._log_tool_execution("analyze_pie_chart_data", 
+                                   {"chart_type": chart_type, "days": days}, 
+                                   result, execution_time, True)
+            
+            return result
+            
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            error_msg = f"Error analyzing pie chart data: {str(e)}"
+            self._log_tool_execution("analyze_pie_chart_data", 
+                                   {"chart_type": chart_type, "days": days}, 
+                                   {}, execution_time, False, error_msg)
+            return {"error": error_msg}
+    
+    def analyze_duplicate_keywords(self, days: int = 7) -> Dict[str, Any]:
+        """Analyze duplicate keywords across campaigns and provide consolidation recommendations"""
+        start_time = time.time()
+        try:
+            # Calculate date range
+            end_date = timezone.now().date()
+            start_date = end_date - timezone.timedelta(days=days)
+            
+            # Get all keywords from the period
+            keywords = GoogleAdsKeyword.objects.filter(
+                ad_group__campaign__account__user=self.user,
+                ad_group__campaign__account__is_active=True
+            ).select_related('ad_group', 'ad_group__campaign')
+            
+            if not keywords.exists():
+                return {"error": "No keywords found for analysis"}
+            
+            # Group keywords by text to find duplicates
+            keyword_groups = {}
+            for keyword in keywords:
+                keyword_text = keyword.keyword_text.lower().strip()
+                if keyword_text not in keyword_groups:
+                    keyword_groups[keyword_text] = []
+                
+                keyword_groups[keyword_text].append({
+                    "keyword_id": keyword.id,
+                    "keyword_text": keyword.keyword_text,
+                    "campaign_name": keyword.ad_group.campaign.campaign_name,
+                    "ad_group_name": keyword.ad_group.ad_group_name,
+                    "match_type": keyword.match_type,
+                    "status": keyword.status
+                })
+            
+            # Find duplicates (keywords appearing in multiple campaigns)
+            duplicates = []
+            for keyword_text, instances in keyword_groups.items():
+                if len(instances) > 1:
+                    # Get performance data for this keyword across all instances
+                    keyword_performance = []
+                    for instance in instances:
+                        performance = GoogleAdsPerformance.objects.filter(
+                            keyword__id=instance['keyword_id'],
+                            date__gte=start_date,
+                            date__lte=end_date
+                        ).aggregate(
+                            total_impressions=Sum('impressions'),
+                            total_clicks=Sum('clicks'),
+                            total_cost=Sum('cost'),
+                            total_conversions=Sum('conversions')
+                        )
+                        
+                        if performance['total_impressions']:
+                            ctr = (performance['total_clicks'] / performance['total_impressions']) * 100
+                            cpc = performance['total_cost'] / performance['total_clicks'] if performance['total_clicks'] > 0 else 0
+                        else:
+                            ctr = 0
+                            cpc = 0
+                        
+                        instance.update({
+                            "impressions": performance['total_impressions'] or 0,
+                            "clicks": performance['total_clicks'] or 0,
+                            "cost": round(float(performance['total_cost'] or 0), 2),
+                            "conversions": performance['total_conversions'] or 0,
+                            "ctr": round(ctr, 2),
+                            "cpc": round(float(cpc), 2)
+                        })
+                        keyword_performance.append(instance)
+                    
+                    duplicates.append({
+                        "keyword_text": keyword_text,
+                        "instances": keyword_performance,
+                        "campaigns_count": len(instances),
+                        "total_impressions": sum(i['impressions'] for i in instances),
+                        "total_clicks": sum(i['clicks'] for i in instances),
+                        "total_cost": sum(i['cost'] for i in instances),
+                        "total_conversions": sum(i['conversions'] for i in instances)
+                    })
+            
+            # Sort duplicates by number of campaigns (most duplicated first)
+            duplicates.sort(key=lambda x: x['campaigns_count'], reverse=True)
+            
+            # Generate insights and recommendations
+            insights = []
+            recommendations = []
+            
+            if duplicates:
+                total_duplicates = len(duplicates)
+                insights.append(f"Found {total_duplicates} duplicate keywords across campaigns")
+                
+                most_duplicated = duplicates[0]
+                insights.append(f"Most duplicated: '{most_duplicated['keyword_text']}' appears in {most_duplicated['campaigns_count']} campaigns")
+                
+                # Recommendations
+                recommendations.append("Prioritize consolidation of keywords appearing in 3+ campaigns")
+                recommendations.append("Keep the best performing instance and add as negative keywords in others")
+                recommendations.append("Consider campaign restructuring to reduce keyword overlap")
+                recommendations.append("Monitor performance after consolidation for 2-4 weeks")
+            
+            result = {
+                "duplicates": duplicates,
+                "total_duplicates": len(duplicates),
+                "period_days": days,
+                "insights": insights,
+                "recommendations": recommendations,
+                "analysis_type": "duplicate_keywords_analysis"
+            }
+            
+            execution_time = int((time.time() - start_time) * 1000)
+            self._log_tool_execution("analyze_duplicate_keywords", 
+                                   {"days": days}, 
+                                   result, execution_time, True)
+            
+            return result
+            
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            error_msg = f"Error analyzing duplicate keywords: {str(e)}"
+            self._log_tool_execution("analyze_duplicate_keywords", 
+                                   {"days": days}, 
+                                   {}, execution_time, False, error_msg)
+            return {"error": error_msg}
+    
+    def dig_deeper_analysis(self, base_analysis: Dict[str, Any], depth: int = 2) -> Dict[str, Any]:
+        """Provide deeper analysis based on previous analysis results"""
+        start_time = time.time()
+        try:
+            if depth > 2:
+                return {"error": "Maximum dig deeper depth is 2 levels"}
+            
+            analysis_type = base_analysis.get('analysis_type', 'unknown')
+            result = {
+                "base_analysis": base_analysis,
+                "dig_deeper_depth": depth,
+                "analysis_type": "dig_deeper_analysis"
+            }
+            
+            if analysis_type == "campaign_summary_comparison":
+                # Provide deeper campaign insights
+                campaigns = base_analysis.get('campaigns', [])
+                if campaigns:
+                    # Analyze performance patterns
+                    high_performers = [c for c in campaigns if c.get('conversions', 0) > 0]
+                    low_performers = [c for c in campaigns if c.get('conversions', 0) == 0]
+                    
+                    result["deeper_insights"] = {
+                        "high_performing_campaigns": len(high_performers),
+                        "low_performing_campaigns": len(low_performers),
+                        "conversion_rate": len(high_performers) / len(campaigns) * 100 if campaigns else 0
+                    }
+                    
+                    # Specific recommendations based on depth
+                    if depth == 1:
+                        result["recommendations"] = [
+                            "Focus budget on campaigns with conversions",
+                            "Investigate why some campaigns have 0 conversions",
+                            "Consider pausing consistently underperforming campaigns"
+                        ]
+                    elif depth == 2:
+                        result["recommendations"] = [
+                            "Implement conversion tracking if not already in place",
+                            "Review landing page quality for non-converting campaigns",
+                            "Analyze keyword quality scores for underperforming campaigns",
+                            "Consider audience targeting adjustments"
+                        ]
+            
+            elif analysis_type == "performance_summary":
+                # Provide deeper performance insights
+                daily_data = base_analysis.get('daily_performance', [])
+                if daily_data:
+                    # Find patterns in daily performance
+                    high_ctr_days = [d for d in daily_data if d.get('ctr', 0) > 5]  # Assuming 5% is high
+                    low_cpc_days = [d for d in daily_data if d.get('cpc', 0) < 50]  # Assuming ₹50 is low
+                    
+                    result["deeper_insights"] = {
+                        "high_ctr_days": len(high_ctr_days),
+                        "low_cpc_days": len(low_cpc_days),
+                        "best_performing_day": max(daily_data, key=lambda x: x.get('clicks', 0)) if daily_data else None
+                    }
+                    
+                    if depth == 1:
+                        result["recommendations"] = [
+                            "Analyze what caused high CTR on specific days",
+                            "Investigate factors leading to low CPC days",
+                            "Replicate successful day strategies"
+                        ]
+                    elif depth == 2:
+                        result["recommendations"] = [
+                            "Review ad scheduling and day-of-week performance",
+                            "Analyze competitor activity patterns",
+                            "Check for external events affecting performance",
+                            "Implement day-parting strategies based on insights"
+                        ]
+            
+            else:
+                result["deeper_insights"] = "Deep analysis not available for this analysis type"
+                result["recommendations"] = ["Try a different analysis type for deeper insights"]
+            
+            execution_time = int((time.time() - start_time) * 1000)
+            self._log_tool_execution("dig_deeper_analysis", 
+                                   {"analysis_type": analysis_type, "depth": depth}, 
+                                   result, execution_time, True)
+            
+            return result
+            
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            error_msg = f"Error in dig deeper analysis: {str(e)}"
+            self._log_tool_execution("dig_deeper_analysis", 
+                                   {"analysis_type": base_analysis.get('analysis_type', 'unknown'), "depth": depth}, 
+                                   {}, execution_time, False, error_msg)
+            return {"error": error_msg}
+
+
 # Function to get all available tools for a user
 def get_all_tools(user: User, session_id: str = None) -> List:
     """Get all available tools for a user"""
