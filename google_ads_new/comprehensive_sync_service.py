@@ -54,28 +54,37 @@ class ComprehensiveGoogleAdsSyncService:
                 self.logger.error("Google Ads library not available")
                 return False
             
-            # Get credentials from database
-            from accounts.models import UserGoogleAuth
+            # Get credentials from database using centralized service
+            from accounts.google_oauth_service import UserGoogleAuthService
+            from django.contrib.auth.models import User
             
             if not self.user_id:
                 raise ValueError("User ID is required to get credentials from database")
             
-            # Get the user's Google OAuth credentials
-            user_auth = UserGoogleAuth.objects.filter(
-                user_id=self.user_id,
-                is_active=True
-            ).first()
+            # Get user instance
+            try:
+                user = User.objects.get(id=self.user_id)
+            except User.DoesNotExist:
+                raise ValueError(f"User with ID {self.user_id} not found")
             
-            if not user_auth:
-                raise ValueError(f"No active Google OAuth credentials found for user {self.user_id}")
+            # Get valid access token (will refresh if needed)
+            access_token = UserGoogleAuthService.get_or_refresh_valid_token(user)
+            
+            if not access_token:
+                raise ValueError(f"No valid Google OAuth credentials found for user {self.user_id}")
+            
+            # Get Google Ads customer ID
+            customer_id = UserGoogleAuthService.get_google_ads_customer_id(user)
+            if not customer_id:
+                raise ValueError(f"No Google Ads customer ID found for user {self.user_id}")
             
             # Create credentials dictionary
             credentials = {
                 'client_id': os.getenv('GOOGLE_OAUTH_CLIENT_ID'),
                 'client_secret': os.getenv('GOOGLE_OAUTH_CLIENT_SECRET'),
                 'developer_token': os.getenv('GOOGLE_ADS_DEVELOPER_TOKEN'),
-                'refresh_token': user_auth.refresh_token,
-                'login_customer_id': self.manager_customer_id or user_auth.google_ads_customer_id,
+                'access_token': access_token,
+                'login_customer_id': self.manager_customer_id or customer_id,
             }
             
             # Initialize the Google Ads client

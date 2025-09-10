@@ -24,7 +24,7 @@ from .models import (
     GoogleAdsAccount, GoogleAdsCampaign, GoogleAdsAdGroup,
     GoogleAdsKeyword, GoogleAdsPerformance, DataSyncLog
 )
-from .google_ads_api_service import GoogleAdsAPIService
+from .google_ads_api_service import GoogleAdsAPIService, list_accessible_customers
 from .sync_service import GoogleAdsSyncService
 from .tasks import (
     daily_sync_task, weekly_sync_task, force_sync_task,
@@ -1192,6 +1192,106 @@ def account_summary_view(request):
         
     except Exception as e:
         logger.error(f"Error in account summary view: {e}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_accessible_customers_view(request):
+    """Get list of accessible Google Ads customers for the authenticated user and save to database"""
+    try:
+        # Use the wrapper function to get accessible customers
+        result = list_accessible_customers(user_id=request.user.id)
+        
+        if result['success']:
+            # Save accessible customers to UserGoogleAuth table
+            try:
+                from accounts.models import UserGoogleAuth
+                
+                # Get the user's active Google Auth record
+                user_auth = UserGoogleAuth.objects.filter(
+                    user=request.user, 
+                    is_active=True
+                ).first()
+                
+                if user_auth:
+                    # Update the accessible_customers field
+                    user_auth.accessible_customers = {
+                        'customers': result['customers'],
+                        'total_count': result['total_count'],
+                        'last_updated': timezone.now().isoformat(),
+                        'raw_response': result['raw_response']
+                    }
+                    user_auth.save()
+                    logger.info(f"Saved {result['total_count']} accessible customers for user {request.user.id}")
+                else:
+                    logger.warning(f"No active Google Auth record found for user {request.user.id}")
+                    
+            except Exception as save_error:
+                logger.error(f"Error saving accessible customers to database: {save_error}")
+                # Don't fail the API call if saving fails, just log the error
+            
+            return Response({
+                'success': True,
+                'customers': result['customers'],
+                'total_count': result['total_count'],
+                'raw_response': result['raw_response'],
+                'message': f'Found {result["total_count"]} accessible customers',
+                'saved_to_db': True
+            })
+        else:
+            return Response({
+                'success': False,
+                'error': result['error']
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        logger.error(f"Error in list_accessible_customers_view: {e}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_saved_accessible_customers_view(request):
+    """Get saved accessible customers from the database for the authenticated user"""
+    try:
+        from accounts.models import UserGoogleAuth
+        
+        # Get the user's active Google Auth record
+        user_auth = UserGoogleAuth.objects.filter(
+            user=request.user, 
+            is_active=True
+        ).first()
+        
+        if not user_auth:
+            return Response({
+                'success': False,
+                'error': 'No active Google Auth record found. Please authenticate with Google first.'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        if not user_auth.accessible_customers:
+            return Response({
+                'success': False,
+                'error': 'No accessible customers saved. Please call the list-accessible-customers endpoint first.'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        return Response({
+            'success': True,
+            'customers': user_auth.accessible_customers.get('customers', []),
+            'total_count': user_auth.accessible_customers.get('total_count', 0),
+            'last_updated': user_auth.accessible_customers.get('last_updated'),
+            'raw_response': user_auth.accessible_customers.get('raw_response', {}),
+            'message': f'Retrieved {user_auth.accessible_customers.get("total_count", 0)} saved accessible customers'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in get_saved_accessible_customers_view: {e}")
         return Response({
             'success': False,
             'error': str(e)

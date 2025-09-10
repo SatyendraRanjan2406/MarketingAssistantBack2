@@ -60,7 +60,7 @@ class UserGoogleAuthAdmin(admin.ModelAdmin):
             'fields': ('google_user_id', 'google_email', 'google_name')
         }),
         ('Google Ads', {
-            'fields': ('google_ads_customer_id', 'google_ads_account_name')
+            'fields': ('google_ads_customer_id', 'google_ads_account_name', 'accessible_customers')
         }),
         ('Status & Metadata', {
             'fields': ('last_used', 'created_at', 'updated_at')

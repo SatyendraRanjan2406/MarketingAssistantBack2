@@ -143,7 +143,8 @@ class LLMSetup:
         - POSTER_GENERATOR: Generate poster templates and design suggestions
         - META_ADS_CREATIVES: Generate creative ideas specifically for Meta/Facebook ads
         
-        INTENT DETECTION RULES:
+        Use rules of general english and intelligent detection to classify the intent based on matching the user input to its closest matching intent .                                                       
+        SAMPLE INTENT DETECTION RULES:
         - If user asks to "compare", "sort", "analyze" campaigns → CAMPAIGN_SUMMARY_COMPARISON
         - If user asks for "performance summary", "metrics", "ROAS" → PERFORMANCE_SUMMARY
         - If user asks for "trends", "daily trends", "graphs" → TREND_ANALYSIS

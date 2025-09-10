@@ -299,6 +299,31 @@ class GoogleOAuthService:
         except Exception as e:
             logger.error(f"Error validating token: {str(e)}")
             return False
+    
+    def revoke_token(self, access_token: str) -> bool:
+        """
+        Revoke access token with Google
+        
+        Args:
+            access_token: Access token to revoke
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            import requests
+            
+            revoke_url = "https://oauth2.googleapis.com/revoke"
+            data = {'token': access_token}
+            
+            response = requests.post(revoke_url, data=data)
+            response.raise_for_status()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error revoking token: {str(e)}")
+            return False
 
 
 class UserGoogleAuthService:
@@ -430,3 +455,125 @@ class UserGoogleAuthService:
                 auth_record.save()
             
             return None
+    
+    @staticmethod
+    def get_or_refresh_valid_token(user) -> Optional[str]:
+        """
+        Get a valid access token for user, refreshing if necessary
+        
+        Args:
+            user: Django User instance
+            
+        Returns:
+            Valid access token string if available, None otherwise
+        """
+        try:
+            # First try to get a valid token
+            auth_record = UserGoogleAuthService.get_valid_auth(user)
+            if auth_record:
+                return auth_record.access_token
+            
+            # If no valid token, try to refresh
+            auth_record = UserGoogleAuthService.refresh_user_tokens(user)
+            if auth_record:
+                return auth_record.access_token
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting/refreshing token for user {user.id}: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_google_ads_customer_id(user) -> Optional[str]:
+        """
+        Get Google Ads customer ID for user
+        
+        Args:
+            user: Django User instance
+            
+        Returns:
+            Google Ads customer ID if available, None otherwise
+        """
+        try:
+            auth_record = UserGoogleAuthService.get_valid_auth(user)
+            if auth_record and auth_record.google_ads_customer_id:
+                return auth_record.google_ads_customer_id
+            
+            # Try to refresh and get customer ID
+            auth_record = UserGoogleAuthService.refresh_user_tokens(user)
+            if auth_record and auth_record.google_ads_customer_id:
+                return auth_record.google_ads_customer_id
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting Google Ads customer ID for user {user.id}: {str(e)}")
+            return None
+    
+    @staticmethod
+    def revoke_user_auth(user) -> bool:
+        """
+        Revoke and delete Google OAuth connection for user
+        
+        Args:
+            user: Django User instance
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            auth_records = UserGoogleAuth.objects.filter(user=user, is_active=True)
+            
+            for auth_record in auth_records:
+                try:
+                    # Revoke token with Google
+                    oauth_service = GoogleOAuthService()
+                    oauth_service.revoke_token(auth_record.access_token)
+                except Exception as e:
+                    logger.warning(f"Failed to revoke token with Google: {str(e)}")
+                
+                # Mark as inactive
+                auth_record.is_active = False
+                auth_record.save()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error revoking user auth: {str(e)}")
+            return False
+    
+    @staticmethod
+    def get_user_google_accounts(user) -> list:
+        """
+        Get all Google accounts connected by user
+        
+        Args:
+            user: Django User instance
+            
+        Returns:
+            List of connected Google accounts
+        """
+        try:
+            auth_records = UserGoogleAuth.objects.filter(
+                user=user,
+                is_active=True
+            ).order_by('-last_used')
+            
+            accounts = []
+            for auth_record in auth_records:
+                accounts.append({
+                    'id': auth_record.id,
+                    'google_email': auth_record.google_email,
+                    'google_name': auth_record.google_name,
+                    'google_ads_customer_id': auth_record.google_ads_customer_id,
+                    'google_ads_account_name': auth_record.google_ads_account_name,
+                    'last_used': auth_record.last_used,
+                    'is_token_valid': not auth_record.is_token_expired()
+                })
+            
+            return accounts
+            
+        except Exception as e:
+            logger.error(f"Error getting user Google accounts: {str(e)}")
+            return []

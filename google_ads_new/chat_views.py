@@ -37,7 +37,7 @@ class KBDocumentSerializer(serializers.ModelSerializer):
 
 # Chat API Views
 class ChatMessageView(APIView):
-    """Process chat message and return AI response"""
+    """Process chat message and return AI response with enhanced query understanding"""
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
@@ -65,11 +65,78 @@ class ChatMessageView(APIView):
             else:
                 session_id = chat_service.start_session()
             
-            # Process message
-            result = chat_service.process_message(user_message)
-            result['session_id'] = session_id
-            
-            return Response(result, status=status.HTTP_200_OK)
+            # Enhanced Query Understanding Pipeline
+            try:
+                from .query_understanding_system import QueryUnderstandingPipeline
+                query_pipeline = QueryUnderstandingPipeline(request.user)
+                query_understanding = query_pipeline.process_query(user_message)
+                
+                # Log query understanding results
+                logger.info(f"Query understanding completed for user {request.user.id}: {query_understanding.get('query_understanding', {})}")
+                
+                # If query understanding failed, use fallback
+                if not query_understanding.get('success', True):
+                    logger.warning(f"Query understanding failed, using fallback: {query_understanding.get('error')}")
+                    if 'fallback_response' in query_understanding:
+                        # Return the fallback response directly
+                        fallback_response = query_understanding['fallback_response']
+                        fallback_response['session_id'] = session_id
+                        fallback_response['query_understanding'] = query_understanding
+                        return Response(fallback_response, status=status.HTTP_200_OK)
+                
+                # Process message with enhanced understanding
+                result = chat_service.process_message_with_enhanced_understanding(
+                    user_message, 
+                    query_understanding
+                )
+                result['session_id'] = session_id
+                result['query_understanding'] = query_understanding
+                
+                return Response(result, status=status.HTTP_200_OK)
+                
+            except ImportError as e:
+                logger.error(f"Query understanding system not available: {e}")
+                # Fallback to original processing
+                result = chat_service.process_message(user_message)
+                result['session_id'] = session_id
+                result['query_understanding'] = {
+                    'stage': 'not_available',
+                    'error': 'Query understanding system not available'
+                }
+                return Response(result, status=status.HTTP_200_OK)
+                
+            except Exception as e:
+                logger.error(f"Query understanding pipeline failed: {e}")
+                # Use OpenAI service as fallback
+                try:
+                    from .openai_service import GoogleAdsOpenAIService
+                    openai_service = GoogleAdsOpenAIService()
+                    
+                    fallback_response = openai_service.generate_analysis_response(
+                        action="query_understanding_fallback",
+                        data={"user_message": user_message, "error": str(e)},
+                        user_context="Query understanding failed, providing intelligent fallback response"
+                    )
+                    
+                    fallback_response['session_id'] = session_id
+                    fallback_response['query_understanding'] = {
+                        'stage': 'fallback',
+                        'error': str(e),
+                        'fallback_type': 'openai_service'
+                    }
+                    
+                    return Response(fallback_response, status=status.HTTP_200_OK)
+                    
+                except Exception as fallback_error:
+                    logger.error(f"OpenAI fallback also failed: {fallback_error}")
+                    # Final fallback to original processing
+                    result = chat_service.process_message(user_message)
+                    result['session_id'] = session_id
+                    result['query_understanding'] = {
+                        'stage': 'fallback_failed',
+                        'error': f"Query understanding failed: {str(e)}. Fallback also failed: {str(fallback_error)}"
+                    }
+                    return Response(result, status=status.HTTP_200_OK)
             
         except Exception as e:
             logger.error(f"Error in chat message view: {e}")

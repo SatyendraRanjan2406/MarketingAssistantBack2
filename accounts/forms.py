@@ -75,10 +75,18 @@ class UserRegistrationForm(UserCreationForm):
         })
     
     def clean_email(self):
-        """Ensure email is unique"""
+        """Ensure email is unique and not used for Google auth"""
         email = self.cleaned_data.get('email')
+        
+        # Check if email is already used by a regular user
         if User.objects.filter(email=email).exists():
             raise forms.ValidationError('This email address is already in use.')
+        
+        # Check if email is already used for Google auth
+        from .models import UserGoogleAuth
+        if UserGoogleAuth.objects.filter(google_email=email, is_active=True).exists():
+            raise forms.ValidationError('Email used for google auth. use another email')
+        
         return email
     
     def save(self, commit=True):

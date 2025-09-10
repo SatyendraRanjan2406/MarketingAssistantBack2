@@ -1,1 +1,1 @@
-# Management package for google_ads_new app
+# Management commands for google_ads_new app

@@ -72,62 +72,105 @@ def get_google_account_info(user):
 def api_signup(request):
     """API endpoint for user registration with JWT tokens"""
     try:
-        # Create form data with password1 and password2
-        data = request.data.copy()
+        data = request.data
+        email = data.get('email')
         password = data.get('password')
-        if password:
-            data['password1'] = password
-            data['password2'] = password
+        name = data.get('name', '')
         
-        form = UserRegistrationForm(data)
-        
-        if form.is_valid():
-            user = form.save()
-            
-            # Generate JWT tokens
-            refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
-            refresh_token = str(refresh)
-            
-            # Get user profile info
-            profile = getattr(user, 'profile', None)
-            
-            # Get Google account details (will be false for new users)
-            google_account_info = get_google_account_info(user)
-            
-            response_data = {
-                'success': True,
-                'message': 'Account created successfully!',
-                'access_token': access_token,
-                'refresh_token': refresh_token,
-                'user': {
-                    'id': user.id,
-                    'username': user.username,
-                    'email': user.email,
-                    'first_name': user.first_name,
-                    'last_name': user.last_name,
-                    'company_name': profile.company_name if profile else None,
-                },
-                'google_account': google_account_info
-            }
-            
-            response = Response(response_data, status=status.HTTP_201_CREATED)
-            response["Access-Control-Allow-Credentials"] = "true"
-            return response
-        else:
-            errors = {}
-            for field, field_errors in form.errors.items():
-                errors[field] = [str(error) for error in field_errors]
-            
+        # Validate required fields
+        if not email or not password:
             response_data = {
                 'success': False,
-                'errors': errors
+                'error': 'Email and password are required.'
             }
-            
             response = Response(response_data, status=status.HTTP_400_BAD_REQUEST)
             response["Access-Control-Allow-Credentials"] = "true"
             return response
-            
+        
+        # Check if email is already used by a regular user
+        if User.objects.filter(email=email).exists():
+            response_data = {
+                'success': False,
+                'error': 'This email address is already in use.'
+            }
+            response = Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+        
+        # Check if email is already used for Google auth
+        from .models import UserGoogleAuth
+        if UserGoogleAuth.objects.filter(google_email=email, is_active=True).exists():
+            response_data = {
+                'success': False,
+                'error': 'Email used for google auth. use another email'
+            }
+            response = Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+            response["Access-Control-Allow-Credentials"] = "true"
+            return response
+        
+        # Parse name into first_name and last_name
+        name_parts = name.strip().split(' ', 1) if name else ['', '']
+        first_name = name_parts[0] if len(name_parts) > 0 else ''
+        last_name = name_parts[1] if len(name_parts) > 1 else ''
+        
+        # Generate username from email (before @ symbol)
+        username = email.split('@')[0]
+        # Ensure username is unique
+        original_username = username
+        counter = 1
+        while User.objects.filter(username=username).exists():
+            username = f"{original_username}{counter}"
+            counter += 1
+        
+        # Create user
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name
+        )
+        
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+        refresh_token = str(refresh)
+        
+        # Calculate token expiry (1 hour from now)
+        from datetime import datetime, timedelta
+        expires_in = 3600  # 1 hour in seconds
+        expires_at = datetime.now() + timedelta(seconds=expires_in)
+        
+        # Check if user has Google OAuth connection (should be False for new users)
+        auth_service = UserGoogleAuthService()
+        google_auth_record = auth_service.get_valid_auth(user)
+        has_google_oauth = google_auth_record is not None
+        
+        response_data = {
+            'success': True,
+            'message': 'Account created successfully',
+            'data': {
+                'user': {
+                    'id': str(user.id),
+                    'email': user.email,
+                    'name': name,
+                    'provider': 'email',
+                    'created_at': user.date_joined.isoformat() + 'Z',
+                    'updated_at': user.date_joined.isoformat() + 'Z'
+                },
+                'tokens': {
+                    'access_token': access_token,
+                    'refresh_token': refresh_token,
+                    'expires_in': expires_in
+                },
+                'google_oauth_connected': has_google_oauth
+            }
+        }
+        
+        response = Response(response_data, status=status.HTTP_201_CREATED)
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+        
     except Exception as e:
         response_data = {
             'success': False,
@@ -146,20 +189,29 @@ def api_signin(request):
     """API endpoint for user login with JWT tokens"""
     try:
         data = request.data
-        username = data.get('username')
+        username_or_email = data.get('username') or data.get('email')
         password = data.get('password')
         
-        if not username or not password:
+        if not username_or_email or not password:
             response_data = {
                 'success': False,
-                'error': 'Username and password are required.'
+                'error': 'Username/email and password are required.'
             }
             
             response = Response(response_data, status=status.HTTP_400_BAD_REQUEST)
             response["Access-Control-Allow-Credentials"] = "true"
             return response
         
-        user = authenticate(username=username, password=password)
+        # Try to authenticate with username first, then email
+        user = authenticate(username=username_or_email, password=password)
+        
+        # If username authentication fails, try email authentication
+        if user is None and '@' in username_or_email:
+            try:
+                user_obj = User.objects.get(email=username_or_email)
+                user = authenticate(username=user_obj.username, password=password)
+            except User.DoesNotExist:
+                user = None
         if user is not None:
             # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
@@ -169,23 +221,46 @@ def api_signin(request):
             # Get user profile info
             profile = getattr(user, 'profile', None)
             
-            # Get Google account details if connected
-            google_account_info = get_google_account_info(user)
+            # Check if user has Google OAuth connection
+            auth_service = UserGoogleAuthService()
+            google_auth_record = auth_service.get_valid_auth(user)
+            has_google_oauth = google_auth_record is not None
+            
+            # Get accessible customers if Google OAuth is connected
+            accessible_customers = None
+            if has_google_oauth and google_auth_record.accessible_customers:
+                accessible_customers = {
+                    'customers': google_auth_record.accessible_customers.get('customers', []),
+                    'total_count': google_auth_record.accessible_customers.get('total_count', 0),
+                    'last_updated': google_auth_record.accessible_customers.get('last_updated'),
+                    'raw_response': google_auth_record.accessible_customers.get('raw_response', {})
+                }
+            
+            # Derive name from first_name and last_name
+            name = f"{user.first_name} {user.last_name}".strip()
+            if not name:
+                name = user.username
             
             response_data = {
                 'success': True,
-                'message': 'Login successful!',
-                'access_token': access_token,
-                'refresh_token': refresh_token,
-                'user': {
-                    'id': user.id,
-                    'username': user.username,
-                    'email': user.email,
-                    'first_name': user.first_name,
-                    'last_name': user.last_name,
-                    'company_name': profile.company_name if profile else None,
-                },
-                'google_account': google_account_info
+                'message': 'Login successful',
+                'data': {
+                    'user': {
+                        'id': str(user.id),
+                        'email': user.email,
+                        'name': name,
+                        'provider': 'email',
+                        'created_at': user.date_joined.isoformat() + 'Z',
+                        'updated_at': user.last_login.isoformat() + 'Z' if user.last_login else user.date_joined.isoformat() + 'Z'
+                    },
+                    'tokens': {
+                        'access_token': access_token,
+                        'refresh_token': refresh_token,
+                        'expires_in': 3600
+                    },
+                    'google_oauth_connected': has_google_oauth,
+                    'accessible_customers': accessible_customers
+                }
             }
             
             response = Response(response_data, status=status.HTTP_200_OK)
@@ -194,7 +269,7 @@ def api_signin(request):
         else:
             response_data = {
                 'success': False,
-                'error': 'Invalid username or password.'
+                'error': 'Invalid username/email or password.'
             }
             
             response = Response(response_data, status=status.HTTP_400_BAD_REQUEST)
@@ -568,6 +643,137 @@ def google_oauth_status(request):
         return response
 
 
+@api_view(['GET', 'OPTIONS'])
+@permission_classes([IsAuthenticated])
+def google_oauth_connect(request):
+    """Complete Google OAuth connection - check existing or initiate new flow"""
+    # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        response = Response(status=status.HTTP_200_OK)
+        return response
+    
+    try:
+        auth_service = UserGoogleAuthService()
+        
+        # Check if user already has a valid Google OAuth connection
+        auth_record = auth_service.get_valid_auth(request.user)
+        
+        if auth_record:
+            # Check if token is expired
+            if auth_record.is_token_expired():
+                # Try to refresh the token
+                try:
+                    refreshed_record = auth_service.refresh_user_tokens(request.user)
+                    if refreshed_record:
+                        response_data = {
+                            'success': True,
+                            'connected': True,
+                            'message': 'Google OAuth connection refreshed successfully',
+                            'google_auth': {
+                                'id': refreshed_record.id,
+                                'google_email': refreshed_record.google_email,
+                                'google_name': refreshed_record.google_name,
+                                'scopes': refreshed_record.scopes,
+                                'is_active': refreshed_record.is_active,
+                                'last_used': refreshed_record.last_used.isoformat() + 'Z',
+                                'token_expiry': refreshed_record.token_expiry.isoformat() + 'Z',
+                                'is_token_expired': refreshed_record.is_token_expired(),
+                                'needs_refresh': refreshed_record.needs_refresh()
+                            }
+                        }
+                    else:
+                        # Refresh failed, return 401
+                        response_data = {
+                            'success': False,
+                            'connected': False,
+                            'error': 'Google OAuth token refresh failed. Please reconnect your Google account.',
+                            'requires_reauth': True
+                        }
+                        response = Response(response_data, status=status.HTTP_401_UNAUTHORIZED)
+                        return response
+                except Exception as refresh_error:
+                    # Refresh failed, return 401
+                    response_data = {
+                        'success': False,
+                        'connected': False,
+                        'error': f'Google OAuth token refresh failed: {str(refresh_error)}. Please reconnect your Google account.',
+                        'requires_reauth': True
+                    }
+                    response = Response(response_data, status=status.HTTP_401_UNAUTHORIZED)
+                    response["Access-Control-Allow-Credentials"] = "true"
+                    return response
+            else:
+                # Token is still valid
+                response_data = {
+                    'success': True,
+                    'connected': True,
+                    'message': 'Google OAuth connection is active and valid',
+                    'google_auth': {
+                        'id': auth_record.id,
+                        'google_email': auth_record.google_email,
+                        'google_name': auth_record.google_name,
+                        'scopes': auth_record.scopes,
+                        'is_active': auth_record.is_active,
+                        'last_used': auth_record.last_used.isoformat() + 'Z',
+                        'token_expiry': auth_record.token_expiry.isoformat() + 'Z',
+                        'is_token_expired': auth_record.is_token_expired(),
+                        'needs_refresh': auth_record.needs_refresh()
+                    }
+                }
+        else:
+            # No Google OAuth connection found - initiate OAuth flow
+            from django.conf import settings
+            import secrets
+            import urllib.parse
+            
+            # Generate state parameter for CSRF protection with user ID
+            import time
+            timestamp = int(time.time())
+            state = f"user_{request.user.id}_{timestamp}_{secrets.token_urlsafe(16)}"
+            
+            # Store state in session for validation
+            request.session['google_oauth_state'] = state
+            
+            # Build Google OAuth URL
+            scopes = settings.GOOGLE_OAUTH_CONFIG['scopes']
+            if isinstance(scopes, list):
+                scopes = ' '.join(scopes)
+            
+            google_oauth_url = (
+                f"https://accounts.google.com/o/oauth2/v2/auth?"
+                f"client_id={settings.GOOGLE_OAUTH_CONFIG['client_id']}&"
+                f"redirect_uri={urllib.parse.quote(settings.GOOGLE_OAUTH_CONFIG['redirect_uri'])}&"
+                f"scope={urllib.parse.quote(scopes)}&"
+                f"response_type=code&"
+                f"state={state}&"
+                f"access_type=offline&"
+                f"prompt=consent"
+            )
+            
+            response_data = {
+                'success': True,
+                'connected': False,
+                'message': 'No Google OAuth connection found. OAuth flow initiated.',
+                'authorization_url': google_oauth_url,
+                'state': state,
+                'requires_reauth': False
+            }
+        
+        response = Response(response_data, status=status.HTTP_200_OK)
+        return response
+        
+    except Exception as e:
+        response_data = {
+            'success': False,
+            'connected': False,
+            'error': str(e),
+            'requires_reauth': True
+        }
+        
+        response = Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return response
+
+
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -683,10 +889,10 @@ def google_oauth_exchange_tokens(request):
             return response
         
         # Extract user ID from state parameter
-        # State format: user_{user_id}_{timestamp}
+        # State format: user_{user_id}_{timestamp}_{random_string}
         try:
             state_parts = state.split('_')
-            if len(state_parts) >= 2 and state_parts[0] == 'user':
+            if len(state_parts) >= 3 and state_parts[0] == 'user':
                 user_id = int(state_parts[1])
                 user = User.objects.get(id=user_id)
             else:

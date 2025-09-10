@@ -38,33 +38,43 @@ class GoogleAdsAPIService:
     def _get_credentials_from_db(self) -> Dict[str, Any]:
         """Get Google Ads credentials from database for the current user"""
         try:
-            from accounts.models import UserGoogleAuth
+            from accounts.google_oauth_service import UserGoogleAuthService
+            from django.contrib.auth.models import User
             
             if not self.user_id:
                 raise ValueError("User ID is required to get credentials from database")
             
-            # Get the user's Google OAuth credentials
-            user_auth = UserGoogleAuth.objects.filter(
-                user_id=self.user_id,
-                is_active=True
-            ).first()
+            # Get user instance
+            try:
+                user = User.objects.get(id=self.user_id)
+            except User.DoesNotExist:
+                raise ValueError(f"User with ID {self.user_id} not found")
             
-            if not user_auth:
-                raise ValueError(f"No active Google OAuth credentials found for user {self.user_id}")
+            # Get valid access token (will refresh if needed)
+            access_token = UserGoogleAuthService.get_or_refresh_valid_token(user)
             
-            # Check if token needs refresh
-            if user_auth.needs_refresh():
-                self.logger.info("Token needs refresh, refreshing...")
-                # You can implement token refresh here or let the calling code handle it
-                pass
+            if not access_token:
+                raise ValueError(f"No valid Google OAuth credentials found for user {self.user_id}")
+            
+            # Get refresh token from the OAuth record
+            from accounts.models import UserGoogleAuth
+            auth_record = UserGoogleAuth.objects.filter(user=user, is_active=True).first()
+            if not auth_record or not auth_record.refresh_token:
+                raise ValueError(f"No refresh token found for user {self.user_id}")
+            
+            # Get Google Ads customer ID
+            customer_id = UserGoogleAuthService.get_google_ads_customer_id(user)
+            if not customer_id:
+                raise ValueError(f"No Google Ads customer ID found for user {self.user_id}")
             
             # Return credentials in the format expected by Google Ads client
             return {
                 'client_id': os.getenv('GOOGLE_OAUTH_CLIENT_ID'),
                 'client_secret': os.getenv('GOOGLE_OAUTH_CLIENT_SECRET'),
                 'developer_token': os.getenv('GOOGLE_ADS_DEVELOPER_TOKEN'),
-                'refresh_token': user_auth.refresh_token,
-                'login_customer_id': self.customer_id or user_auth.google_ads_customer_id,
+                'refresh_token': auth_record.refresh_token,
+                'login_customer_id': self.customer_id or customer_id,
+                'use_proto_plus': True,  # Required for Google Ads API client
             }
             
         except Exception as e:
@@ -107,9 +117,7 @@ class GoogleAdsAPIService:
                     campaign.status,
                     campaign.advertising_channel_type,
                     campaign.start_date,
-                    campaign.end_date,
-                    campaign.budget_amount_micros,
-                    campaign.budget_type
+                    campaign.end_date
                 FROM campaign
                 WHERE campaign.status != 'REMOVED'
                 ORDER BY campaign.id
@@ -128,8 +136,6 @@ class GoogleAdsAPIService:
                         'campaign_type': row.campaign.advertising_channel_type.name,
                         'start_date': row.campaign.start_date,
                         'end_date': row.campaign.end_date,
-                        'budget_amount': row.campaign.budget_amount_micros / 1000000 if row.campaign.budget_amount_micros else None,
-                        'budget_type': row.campaign.budget_type.name if row.campaign.budget_type else None,
                     }
                     campaigns.append(campaign_data)
             
@@ -487,7 +493,145 @@ class GoogleAdsAPIService:
             }
         except Exception as e:
             self.logger.error(f"Error in get_pending_access_requests: {e}")
-            return {'success': False, 'error': str(e)} 
+            return {'success': False, 'error': str(e)}
+
+    def list_accessible_customers(self) -> Dict[str, Any]:
+        """List all accessible customers using the Google Ads API v21 listAccessibleCustomers endpoint"""
+        try:
+            import requests
+            
+            # Get access token from database
+            credentials = self._get_credentials_from_db()
+            access_token = UserGoogleAuthService.get_or_refresh_valid_token(
+                User.objects.get(id=self.user_id)
+            )
+            
+            if not access_token:
+                return {
+                    'success': False,
+                    'error': 'No valid access token found. Please authenticate with Google first.'
+                }
+            
+            # Get developer token from environment
+            developer_token = os.getenv('GOOGLE_ADS_DEVELOPER_TOKEN')
+            if not developer_token:
+                return {
+                    'success': False,
+                    'error': 'Developer token not configured in environment variables'
+                }
+            
+            # Make the API call to list accessible customers
+            url = "https://googleads.googleapis.com/v21/customers:listAccessibleCustomers"
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "developer-token": developer_token
+            }
+            
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            
+            customers_data = response.json()
+            
+            self.logger.info(f"Successfully retrieved accessible customers: {customers_data}")
+            
+            return {
+                'success': True,
+                'customers': customers_data.get('resourceNames', []),
+                'total_count': len(customers_data.get('resourceNames', [])),
+                'raw_response': customers_data
+            }
+            
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"HTTP request error in list_accessible_customers: {e}")
+            return {
+                'success': False,
+                'error': f'HTTP request error: {str(e)}'
+            }
+        except Exception as e:
+            self.logger.error(f"Error in list_accessible_customers: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            } 
+
+def list_accessible_customers(user_id: int = None) -> Dict[str, Any]:
+    """
+    Standalone function to list accessible customers using Google Ads API v21
+    This matches the user's requested code structure and the cURL example provided
+    """
+    try:
+        import requests
+        from accounts.google_oauth_service import UserGoogleAuthService
+        from django.contrib.auth.models import User
+        
+        # Get user instance if user_id provided
+        if user_id:
+            try:
+                user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                return {
+                    'success': False,
+                    'error': f'User with ID {user_id} not found'
+                }
+        else:
+            # For testing purposes, get the first user
+            user = User.objects.first()
+            if not user:
+                return {
+                    'success': False,
+                    'error': 'No users found in the system'
+                }
+        
+        # Get valid access token (will refresh if needed)
+        access_token = UserGoogleAuthService.get_or_refresh_valid_token(user)
+        
+        if not access_token:
+            return {
+                'success': False,
+                'error': 'No valid Google OAuth credentials found. Please authenticate with Google first.'
+            }
+        
+        # Get developer token from environment
+        developer_token = os.getenv('GOOGLE_ADS_DEVELOPER_TOKEN')
+        if not developer_token:
+            return {
+                'success': False,
+                'error': 'Developer token not configured in environment variables'
+            }
+        
+        # Make the API call to list accessible customers
+        url = "https://googleads.googleapis.com/v21/customers:listAccessibleCustomers"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "developer-token": developer_token
+        }
+        
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        
+        customers_data = response.json()
+        
+        print(f"Successfully retrieved accessible customers: {customers_data}")
+        
+        return {
+            'success': True,
+            'customers': customers_data.get('resourceNames', []),
+            'total_count': len(customers_data.get('resourceNames', [])),
+            'raw_response': customers_data
+        }
+        
+    except requests.exceptions.RequestException as e:
+        print(f"HTTP request error: {e}")
+        return {
+            'success': False,
+            'error': f'HTTP request error: {str(e)}'
+        }
+    except Exception as e:
+        print(f"Error: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
 
 def send_link_request(manager_customer_id: str, client_customer_id: str, user_id: int = None) -> Dict[str, Any]:
     """

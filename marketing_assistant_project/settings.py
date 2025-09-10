@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'google_ads_new',
     'accounts',
+    'ad_expert',
 ]
 
 MIDDLEWARE = [
@@ -221,7 +222,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://mktngasst.s3-website.ap-south-1.amazonaws.com",
-    "https://ce3df4640f22.ngrok-free.app/"
+    "https://ce3df4640f22.ngrok-free.app/",
+    "http://mktngasst.s3-website.ap-south-1.amazonaws.com/"
 ]
 
 # CSRF exemption for API endpoints
@@ -237,7 +239,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
     "http://localhost:5173",
-    "http://mktngasst.s3-website.ap-south-1.amazonaws.com"
+    "http://localhost:8080",
+    "http://mktngasst.s3-website.ap-south-1.amazonaws.com",
+    
 ]
 
 # CORS with credentials support
@@ -252,6 +256,12 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    'sec-ch-ua',
+    'sec-ch-ua-mobile',
+    'sec-ch-ua-platform',
+    'cache-control',
+    'pragma',
+    'referer',
 ]
 
 CORS_EXPOSE_HEADERS = [

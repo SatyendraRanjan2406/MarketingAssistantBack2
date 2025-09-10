@@ -37,6 +37,7 @@ class UserGoogleAuth(models.Model):
     # Google Ads specific
     google_ads_customer_id = models.CharField(max_length=20, blank=True, null=True, help_text="Google Ads customer ID")
     google_ads_account_name = models.CharField(max_length=255, blank=True, null=True, help_text="Google Ads account name")
+    accessible_customers = models.JSONField(blank=True, null=True, help_text="List of accessible Google Ads customer IDs")
     
     # Token scopes
     scopes = models.TextField(help_text="Comma-separated list of granted OAuth scopes")

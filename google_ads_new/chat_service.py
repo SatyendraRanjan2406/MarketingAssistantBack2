@@ -7,6 +7,7 @@ from .models import (
 )
 from .llm_setup import llm_setup
 from .langchain_tools import get_all_tools
+from .memory_manager import MemoryManager
 import json
 import logging
 from datetime import datetime, date
@@ -203,6 +204,9 @@ class ChatService:
         self.memory_window = 10  # Remember last 10 messages
         self.image_generator = None
         self.initialize_image_generator()
+        
+        # Initialize memory manager for enhanced memory features
+        self.memory_manager = MemoryManager(self.user)
     
     def initialize_image_generator(self):
         """Initialize the image generator with OpenAI API key"""
@@ -391,9 +395,34 @@ class ChatService:
         return context
     
     def process_message(self, user_message: str) -> Dict[str, Any]:
-        """Process user message and generate response"""
+        """Process user message and generate response with enhanced memory features"""
         response_content = None
         try:
+            # Create or get conversation session for memory management
+            if not hasattr(self, 'session_id') or not self.session_id:
+                import uuid
+                self.session_id = str(uuid.uuid4())
+                self.memory_manager.create_conversation_session(
+                    self.session_id, 
+                    getattr(self, 'google_ads_account', None)
+                )
+            
+            # Add user message to memory system
+            self.memory_manager.add_user_message(
+                self.session_id, 
+                user_message, 
+                {'timestamp': timezone.now().isoformat()}
+            )
+            
+            # Get relevant cross-session memories for context
+            cross_session_context = self.memory_manager.get_relevant_cross_session_memories(
+                user_message, limit=3
+            )
+            
+            # Get user preferences and expertise level
+            user_preferences = self.memory_manager.get_user_preferences()
+            expertise_level = self.memory_manager.get_expertise_level()
+            
             # Add user message to chat
             self.add_message("user", user_message)
             
@@ -411,8 +440,11 @@ class ChatService:
                     ]
                 }
             
-            # Classify intent
+            # Classify intent with memory context
             intent = llm_setup.classify_intent(user_message)
+            
+            # Add intent to memory system
+            self.memory_manager.add_intent(self.session_id, intent.dict())
             
             # Log intent for fine-tuning
             UserIntent.objects.create(
@@ -423,10 +455,21 @@ class ChatService:
                 tool_calls=intent.parameters
             )
             
-            # Execute tools based on intent
-            tool_results = self._execute_tools(intent)
+            # Learn from user behavior patterns
+            self.memory_manager.learn_user_pattern('intent_usage', {
+                'action': intent.action,
+                'confidence': intent.confidence,
+                'context': user_message[:100],  # First 100 chars for context
+                'timestamp': timezone.now().isoformat()
+            })
             
-            # Generate UI response
+            # Execute tools based on intent            tool_results = self._execute_tools(intent)
+            
+            # Store analysis results in memory
+            if tool_results and 'analysis' in tool_results:
+                self.memory_manager.add_analysis_result(self.session_id, tool_results)
+            
+            # Generate UI response with memory context
             ui_response = llm_setup.generate_ui_response(tool_results, user_message)
             
             # Check if this is a creative content request that needs image generation
@@ -446,6 +489,13 @@ class ChatService:
                 # Update the UI response with enhanced data
                 ui_response_dict = enhanced_response["response"]
                 
+                # Store creative generation in memory
+                self.memory_manager.add_creative_generation(self.session_id, {
+                    'intent': intent.action,
+                    'creative_blocks': [b for b in ui_response_dict.get('blocks', []) if b.get('type') == 'creative'],
+                    'timestamp': timezone.now().isoformat()
+                })
+                
                 # Add assistant response to chat with enhanced data
                 response_content = json.dumps(ui_response_dict, indent=2, cls=CustomJSONEncoder)
                 self.add_message("assistant", response_content, {
@@ -458,11 +508,19 @@ class ChatService:
                 self.session.updated_at = timezone.now()
                 self.session.save()
                 
+                # Store cross-session memory for creative preferences
+                self._store_creative_preferences(ui_response_dict)
+                
                 return {
                     "success": True,
-                    "session_id": str(self.session.id),
+                    "session_id": str(self.session_id),
                     "response": ui_response_dict,
-                    "intent": intent.dict()
+                    "intent": intent.dict(),
+                    "memory_context": {
+                        "cross_session_memories": len(cross_session_context),
+                        "user_preferences": user_preferences,
+                        "expertise_level": expertise_level
+                    }
                 }
             else:
                 # Regular processing without image generation
@@ -478,11 +536,19 @@ class ChatService:
                 self.session.updated_at = timezone.now()
                 self.session.save()
                 
+                # Store cross-session memory for analysis preferences
+                self._store_analysis_preferences(ui_response.dict())
+                
                 return {
                     "success": True,
-                    "session_id": str(self.session.id),
+                    "session_id": str(self.session_id),
                     "response": ui_response.dict(),
-                    "intent": intent.dict()
+                    "intent": intent.dict(),
+                    "memory_context": {
+                        "cross_session_memories": len(cross_session_context),
+                        "user_preferences": user_preferences,
+                        "expertise_level": expertise_level
+                    }
                 }
             
         except Exception as e:
@@ -504,6 +570,344 @@ class ChatService:
                 self.add_message("assistant", json.dumps(error_response, cls=CustomJSONEncoder), {"error": True})
             
             return error_response
+    
+    def process_message_with_enhanced_understanding(self, user_message: str, query_understanding: Dict[str, Any]) -> Dict[str, Any]:
+        """Process user message with enhanced query understanding context"""
+        try:
+            # Create or get conversation session for memory management
+            if not hasattr(self, 'session_id') or not self.session_id:
+                import uuid
+                self.session_id = str(uuid.uuid4())
+                self.memory_manager.create_conversation_session(
+                    self.session_id, 
+                    getattr(self, 'google_ads_account', None)
+                )
+            
+            # Add user message to memory system with enhanced context
+            memory_metadata = {
+                'timestamp': timezone.now().isoformat(),
+                'query_understanding': query_understanding.get('query_understanding', {}),
+                'discovered_campaigns': len(query_understanding.get('campaigns', [])),
+                'business_context': query_understanding.get('business_context', {})
+            }
+            
+            self.memory_manager.add_user_message(
+                self.session_id, 
+                user_message, 
+                memory_metadata
+            )
+            
+            # Get relevant cross-session memories for context
+            cross_session_context = self.memory_manager.get_relevant_cross_session_memories(
+                user_message, limit=3
+            )
+            
+            # Get user preferences and expertise level
+            user_preferences = self.memory_manager.get_user_preferences()
+            expertise_level = self.memory_manager.get_expertise_level()
+            
+            # Add user message to chat
+            self.add_message("user", user_message)
+            
+            # Check if LLM is available
+            if not llm_setup:
+                return self._handle_llm_unavailable()
+            
+            # Enhanced Intent Classification with Context
+            intent = self._classify_intent_with_enhanced_context(user_message, query_understanding)
+            
+            # Add intent to memory system
+            self.memory_manager.add_intent(self.session_id, intent.dict())
+            
+            # Log intent for fine-tuning
+            UserIntent.objects.create(
+                user=self.user,
+                user_query=user_message,
+                detected_intent=intent.action,
+                intent_confidence=intent.confidence,
+                tool_calls=intent.parameters
+            )
+            
+            # Learn from user behavior patterns
+            self.memory_manager.learn_user_pattern('intent_usage', {
+                'action': intent.action,
+                'confidence': intent.confidence,
+                'context': user_message[:100],
+                'query_understanding_confidence': query_understanding.get('query_understanding', {}).get('confidence', 0),
+                'timestamp': timezone.now().isoformat()
+            })
+            
+            # Execute tools with enhanced context
+            tool_results = self._execute_tools_with_enhanced_context(intent, query_understanding)
+            
+            # Store analysis results in memory
+            if tool_results and 'analysis' in tool_results:
+                self.memory_manager.add_analysis_result(self.session_id, tool_results)
+            
+            # Generate UI response with enhanced context
+            ui_response = self._generate_ui_response_with_context(
+                tool_results, 
+                user_message, 
+                query_understanding
+            )
+            
+            # Check if this is a creative content request that needs image generation
+            creative_actions = ["POSTER_GENERATOR", "GENERATE_CREATIVE", "GENERATE_AD_COPIES", "GENERATE_CREATIVES", "META_ADS_CREATIVES"]
+            
+            if intent.action in creative_actions:
+                print(f"🎨 Creative content detected ({intent.action}) - enhancing with images...")
+                
+                # Convert UI response to dict for image enhancement
+                ui_response_dict = ui_response.dict()
+                
+                # Enhance creative blocks with images
+                enhanced_response = self.enhance_creative_blocks_with_images({
+                    "response": ui_response_dict
+                })
+                
+                # Update the UI response with enhanced data
+                ui_response_dict.update(enhanced_response)
+                
+                # Add assistant response to chat with enhanced data
+                response_content = json.dumps(ui_response_dict, indent=2, cls=CustomJSONEncoder)
+                self.add_message("assistant", response_content, {
+                    "intent": intent.dict(),
+                    "tool_results": tool_results,
+                    "ui_blocks": ui_response_dict,
+                    "query_understanding": query_understanding
+                })
+                
+                # Update session
+                self.session.updated_at = timezone.now()
+                self.session.save()
+                
+                # Store cross-session memory for creative preferences
+                self._store_creative_preferences(ui_response_dict)
+                
+                return {
+                    "success": True,
+                    "session_id": str(self.session_id),
+                    "response": ui_response_dict,
+                    "intent": intent.dict(),
+                    "query_understanding": query_understanding,
+                    "memory_context": {
+                        "cross_session_memories": len(cross_session_context),
+                        "user_preferences": user_preferences,
+                        "expertise_level": expertise_level
+                    }
+                }
+            else:
+                # Regular processing without image generation
+                # Add assistant response to chat
+                response_content = json.dumps(ui_response.dict(), indent=2, cls=CustomJSONEncoder)
+                self.add_message("assistant", response_content, {
+                    "intent": intent.dict(),
+                    "tool_results": tool_results,
+                    "ui_blocks": ui_response.dict(),
+                    "query_understanding": query_understanding
+                })
+                
+                # Update session
+                self.session.updated_at = timezone.now()
+                self.session.save()
+                
+                # Store cross-session memory for analysis preferences
+                self._store_analysis_preferences(ui_response.dict())
+                
+                return {
+                    "success": True,
+                    "session_id": str(self.session_id),
+                    "response": ui_response.dict(),
+                    "intent": intent.dict(),
+                    "query_understanding": query_understanding,
+                    "memory_context": {
+                        "cross_session_memories": len(cross_session_context),
+                        "user_preferences": user_preferences,
+                        "expertise_level": expertise_level
+                    }
+                }
+                
+        except Exception as e:
+            logger.error(f"Error processing message with enhanced understanding: {e}")
+            return self._handle_processing_error(e, user_message)
+    
+    def _classify_intent_with_enhanced_context(self, user_message: str, query_understanding: Dict[str, Any]) -> Any:
+        """Classify intent using enhanced context from query understanding"""
+        try:
+            # Get discovered campaigns and context
+            campaigns = query_understanding.get('campaigns', [])
+            business_context = query_understanding.get('business_context', {})
+            parameters = query_understanding.get('parameters', {})
+            
+            # Create enhanced prompt with context
+            enhanced_prompt = f"""
+            User message: {user_message}
+            
+            Discovered Context:
+            - Campaigns: {[c['campaign']['campaign_name'] for c in campaigns[:5]]}
+            - Business Category: {business_context.get('business_category', 'Unknown')}
+            - Target Audience: {business_context.get('target_audience', 'Unknown')}
+            - Extracted Parameters: {parameters}
+            
+            Classify the user's intent considering this context. The user is likely asking about:
+            - Campaigns: {[c['campaign']['campaign_name'] for c in campaigns if c['match_type'] == 'exact']}
+            - Business Context: {business_context.get('business_category', '')}
+            - Objectives: {query_understanding.get('context', {}).get('business_objectives', [])}
+            
+            Return the most appropriate intent based on this context.
+            """
+            
+            # Use the enhanced prompt for classification
+            if hasattr(llm_setup, 'llm'):
+                # Create a custom prompt for context-aware classification
+                from langchain_core.prompts import ChatPromptTemplate
+                
+                context_prompt = ChatPromptTemplate.from_template(enhanced_prompt)
+                chain = context_prompt | llm_setup.llm | llm_setup.intent_parser
+                
+                # Get the enhanced intent
+                enhanced_intent = chain.invoke({"user_message": enhanced_prompt})
+                return enhanced_intent
+            else:
+                # Fallback to regular classification
+                return llm_setup.classify_intent(user_message)
+                
+        except Exception as e:
+            logger.error(f"Enhanced intent classification failed: {e}")
+            # Fallback to regular classification
+            return llm_setup.classify_intent(user_message)
+    
+    def _execute_tools_with_enhanced_context(self, intent: Any, query_understanding: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute tools with enhanced context from query understanding"""
+        try:
+            # Get basic tool results
+            basic_results = self._execute_tools(intent)
+            
+            # Enhance with query understanding context
+            enhanced_results = {
+                **basic_results,
+                'query_understanding': query_understanding,
+                'discovered_campaigns': query_understanding.get('campaigns', []),
+                'business_context': query_understanding.get('business_context', {}),
+                'keyword_suggestions': self._generate_keyword_suggestions_with_context(intent, query_understanding)
+            }
+            
+            return enhanced_results
+            
+        except Exception as e:
+            logger.error(f"Enhanced tool execution failed: {e}")
+            return self._execute_tools(intent)
+    
+    def _generate_keyword_suggestions_with_context(self, intent: Any, query_understanding: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate keyword suggestions using enhanced context"""
+        try:
+            from .query_understanding_system import KeywordIntelligenceTools
+            
+            keyword_tools = KeywordIntelligenceTools(self.user)
+            suggestions = {}
+            
+            # Get discovered campaigns
+            campaigns = query_understanding.get('campaigns', [])
+            
+            for campaign_data in campaigns[:3]:  # Limit to top 3 campaigns
+                campaign = campaign_data['campaign']
+                campaign_id = campaign['id']
+                
+                # Generate keyword suggestions for this campaign
+                campaign_suggestions = keyword_tools.suggest_keywords_for_campaign(
+                    campaign_id=campaign_id,
+                    business_context=query_understanding.get('business_context', {}).get('business_category', ''),
+                    target_audience=query_understanding.get('business_context', {}).get('target_audience', '')
+                )
+                
+                if 'error' not in campaign_suggestions:
+                    suggestions[f"campaign_{campaign_id}"] = campaign_suggestions
+            
+            return suggestions
+            
+        except Exception as e:
+            logger.error(f"Keyword suggestions generation failed: {e}")
+            return {'error': f"Keyword suggestions failed: {str(e)}"}
+    
+    def _generate_ui_response_with_context(self, tool_results: Dict[str, Any], 
+                                         user_message: str, 
+                                         query_understanding: Dict[str, Any]) -> Any:
+        """Generate UI response with enhanced context"""
+        try:
+            # Create enhanced context for UI generation
+            enhanced_context = {
+                'tool_results': tool_results,
+                'query_understanding': query_understanding,
+                'discovered_campaigns': query_understanding.get('campaigns', []),
+                'business_context': query_understanding.get('business_context', {}),
+                'user_message': user_message
+            }
+            
+            # Use the enhanced context for UI generation
+            if hasattr(llm_setup, 'ui_prompt'):
+                # Create a custom prompt with enhanced context
+                from langchain_core.prompts import ChatPromptTemplate
+                
+                enhanced_ui_prompt = ChatPromptTemplate.from_template("""
+                Generate a comprehensive UI response for Google Ads analysis with enhanced context.
+                
+                User Message: {user_message}
+                Tool Results: {tool_results}
+                Query Understanding: {query_understanding}
+                Discovered Campaigns: {discovered_campaigns}
+                Business Context: {business_context}
+                
+                Create UI blocks that reference the discovered campaigns and business context.
+                Include specific insights about the campaigns found and keyword suggestions generated.
+                
+                Return a properly formatted UI response with blocks.
+                """)
+                
+                chain = enhanced_ui_prompt | llm_setup.llm | llm_setup.ui_parser
+                enhanced_response = chain.invoke(enhanced_context)
+                return enhanced_response
+            else:
+                # Fallback to regular UI generation
+                return llm_setup.generate_ui_response(tool_results, user_message)
+                
+        except Exception as e:
+            logger.error(f"Enhanced UI response generation failed: {e}")
+            # Fallback to regular UI generation
+            return llm_setup.generate_ui_response(tool_results, user_message)
+    
+    def _handle_llm_unavailable(self) -> Dict[str, Any]:
+        """Handle case when LLM is not available"""
+        return {
+            "success": False,
+            "error": "AI service not available. Please check OpenAI API configuration.",
+            "blocks": [
+                {
+                    "type": "text",
+                    "content": "AI service is currently unavailable. Please check your OpenAI API configuration.",
+                    "style": "highlight"
+                }
+            ]
+        }
+    
+    def _handle_processing_error(self, error: Exception, user_message: str) -> Dict[str, Any]:
+        """Handle processing errors gracefully"""
+        error_response = {
+            "success": False,
+            "error": str(error),
+            "blocks": [
+                {
+                    "type": "text",
+                    "content": f"I encountered an error: {str(error)}",
+                    "style": "highlight"
+                }
+            ]
+        }
+        
+        # Log error message
+        if self.session:
+            self.add_message("assistant", json.dumps(error_response, cls=CustomJSONEncoder), {"error": True})
+        
+        return error_response
     
     def _execute_tools(self, intent: Any) -> Dict[str, Any]:
         """Execute tools based on detected intent"""
@@ -1418,3 +1822,119 @@ class ChatService:
         except Exception as e:
             logger.error(f"Error getting user data context: {e}")
             return {"error": f"Failed to get user context: {str(e)}"}
+    
+    def _store_creative_preferences(self, response_data: Dict[str, Any]):
+        """Store creative preferences in cross-session memory"""
+        try:
+            creative_blocks = [b for b in response_data.get('blocks', []) if b.get('type') == 'creative']
+            
+            for block in creative_blocks:
+                # Store template preferences
+                if 'template_type' in block:
+                    self.memory_manager.store_cross_session_memory(
+                        'creative_template_preference',
+                        block['template_type'],
+                        {
+                            'template_type': block['template_type'],
+                            'color_scheme': block.get('color_scheme', ''),
+                            'target_audience': block.get('target_audience', ''),
+                            'usage_count': 1
+                        },
+                        importance_score=0.7
+                    )
+                
+                # Store color scheme preferences
+                if 'color_scheme' in block:
+                    self.memory_manager.store_cross_session_memory(
+                        'color_scheme_preference',
+                        block['color_scheme'],
+                        {
+                            'color_scheme': block['color_scheme'],
+                            'template_type': block.get('template_type', ''),
+                            'usage_count': 1
+                        },
+                        importance_score=0.6
+                    )
+                    
+        except Exception as e:
+            logger.error(f"Error storing creative preferences: {e}")
+    
+    def _store_analysis_preferences(self, response_data: Dict[str, Any]):
+        """Store analysis preferences in cross-session memory"""
+        try:
+            # Extract analysis preferences from response
+            blocks = response_data.get('blocks', [])
+            
+            # Check for analysis depth preferences
+            text_blocks = [b for b in blocks if b.get('type') == 'text']
+            for block in text_blocks:
+                content = block.get('content', '').lower()
+                if 'detailed' in content or 'comprehensive' in content:
+                    self.memory_manager.store_cross_session_memory(
+                        'analysis_depth_preference',
+                        'detailed',
+                        {'preferred_depth': 'detailed', 'usage_count': 1},
+                        importance_score=0.8
+                    )
+                elif 'summary' in content or 'overview' in content:
+                    self.memory_manager.store_cross_session_memory(
+                        'analysis_depth_preference',
+                        'summary',
+                        {'preferred_depth': 'summary', 'usage_count': 1},
+                        importance_score=0.8
+                    )
+            
+            # Check for format preferences
+            table_blocks = [b for b in blocks if b.get('type') == 'table']
+            chart_blocks = [b for b in blocks if b.get('type') == 'chart']
+            
+            if table_blocks:
+                self.memory_manager.store_cross_session_memory(
+                    'format_preference',
+                    'tabular',
+                    {'preferred_format': 'tabular', 'usage_count': 1},
+                    importance_score=0.7
+                )
+            
+            if chart_blocks:
+                self.memory_manager.store_cross_session_memory(
+                    'format_preference',
+                    'visual',
+                    {'preferred_format': 'visual', 'usage_count': 1},
+                    importance_score=0.7
+                )
+                
+        except Exception as e:
+            logger.error(f"Error storing analysis preferences: {e}")
+    
+    def get_memory_insights(self) -> Dict[str, Any]:
+        """Get comprehensive memory insights for the user"""
+        try:
+            if not self.memory_manager:
+                return {"error": "Memory manager not initialized"}
+            
+            return self.memory_manager.get_user_insights()
+            
+        except Exception as e:
+            logger.error(f"Error getting memory insights: {e}")
+            return {"error": f"Failed to get memory insights: {str(e)}"}
+    
+    def end_conversation_session(self):
+        """End the current conversation session and store memory"""
+        try:
+            if hasattr(self, 'session_id') and self.session_id:
+                self.memory_manager.end_conversation_session(self.session_id)
+                self.session_id = None
+                logger.info(f"Ended conversation session and stored memory")
+        except Exception as e:
+            logger.error(f"Error ending conversation session: {e}")
+    
+    def cleanup_expired_memories(self) -> int:
+        """Clean up expired cross-session memories"""
+        try:
+            if not self.memory_manager:
+                return 0
+            return self.memory_manager.cleanup_expired_memories()
+        except Exception as e:
+            logger.error(f"Error cleaning up expired memories: {e}")
+            return 0

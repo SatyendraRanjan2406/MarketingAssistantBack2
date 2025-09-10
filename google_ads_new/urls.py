@@ -3,6 +3,8 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from . import chat_views
 from . import live_monitoring_views
+from . import rag_views
+from . import embedding_views
 
 # Create router for ViewSets
 router = DefaultRouter()
@@ -30,6 +32,8 @@ urlpatterns = [
     # Account access management endpoints
     path('api/request-account-access/', views.request_account_access_view, name='google-ads-request-account-access'),
     path('api/pending-access-requests/', views.get_pending_access_requests_view, name='google-ads-pending-access-requests'),
+    path('api/list-accessible-customers/', views.list_accessible_customers_view, name='google-ads-list-accessible-customers'),
+    path('api/saved-accessible-customers/', views.get_saved_accessible_customers_view, name='google-ads-saved-accessible-customers'),
     
     # Legacy endpoints for backward compatibility
     path('api/legacy/sync-status/', views.sync_status_legacy_view, name='google-ads-legacy-sync-status'),
@@ -37,21 +41,6 @@ urlpatterns = [
     path('api/legacy/synced-data/', views.get_synced_data_legacy_view, name='google-ads-legacy-synced-data'),
 ]
 
-# API endpoints
-urlpatterns += [
-    path('api/sync-status/', views.sync_status_view, name='sync_status'),
-    path('api/sync-data/', views.sync_data_view, name='sync_data'),
-    path('api/get-synced-data/', views.get_synced_data_view, name='get_synced_data'),
-    path('api/dashboard-summary/', views.dashboard_summary_view, name='dashboard_summary'),
-    path('api/account-summary/', views.account_summary_view, name='account_summary'),
-    path('api/test-connection/', views.test_connection_view, name='test_connection'),
-    path('api/sync-logs/', views.get_sync_logs_view, name='get_sync_logs'),
-    path('api/request-account-access/', views.request_account_access_view, name='request_account_access'),
-    path('api/pending-access-requests/', views.get_pending_access_requests_view, name='pending_access_requests'),
-    path('api/comprehensive-sync/', views.comprehensive_sync_view, name='comprehensive_sync'),
-    path('api/sync-single-client/', views.sync_single_client_account, name='sync_single_client_account'),
-    path('api/test-single-client-sync/', views.test_single_client_sync, name='test_single_client_sync'),
-]
 
 # Live Monitoring API endpoints
 urlpatterns += [
@@ -90,4 +79,23 @@ urlpatterns += [
     
     # Health check
     path('api/health/', chat_views.HealthCheckView.as_view(), name='health_check'),
+]
+
+# RAG (Retrieval-Augmented Generation) endpoints
+urlpatterns += [
+    # Basic RAG endpoints (no authentication required for testing)
+    path('api/rag/query/', rag_views.query_rag, name='rag_query'),
+    path('api/rag/search/', rag_views.search_documents, name='rag_search'),
+    path('api/rag/status/', rag_views.rag_status, name='rag_status'),
+    path('api/rag/rebuild/', rag_views.rebuild_vector_store, name='rag_rebuild'),
+    
+    # REST API RAG endpoints (authentication required)
+    path('api/rag/api/query/', rag_views.api_query_rag, name='api_rag_query'),
+    path('api/rag/api/search/', rag_views.api_search_documents, name='api_rag_search'),
+    path('api/rag/api/status/', rag_views.api_rag_status, name='api_rag_status'),
+    
+    # Embedding dashboard
+    path('embedding-dashboard/', embedding_views.embedding_dashboard, name='embedding_dashboard'),
+    path('api/rag/embedding-search/', embedding_views.search_embeddings, name='embedding_search'),
+    path('api/rag/embedding-stats/', embedding_views.embedding_stats, name='embedding_stats'),
 ]
