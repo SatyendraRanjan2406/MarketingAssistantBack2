@@ -982,3 +982,57 @@ def google_oauth_exchange_tokens(request):
         response = Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         response["Access-Control-Allow-Credentials"] = "true"
         return response
+
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def refresh_accessible_customers(request):
+    """Refresh accessible customers for the authenticated user"""
+    try:
+        auth_service = UserGoogleAuthService()
+        success = auth_service.refresh_accessible_customers(request.user)
+        
+        if success:
+            # Get updated auth record to return customer info
+            from .models import UserGoogleAuth
+            auth_record = UserGoogleAuth.objects.filter(
+                user=request.user,
+                is_active=True
+            ).first()
+            
+            if auth_record and auth_record.accessible_customers:
+                customers = auth_record.accessible_customers.get('customers', [])
+                response_data = {
+                    'success': True,
+                    'message': f'Successfully refreshed {len(customers)} accessible customers',
+                    'accessible_customers': customers,
+                    'total_count': len(customers),
+                    'last_updated': auth_record.accessible_customers.get('last_updated')
+                }
+            else:
+                response_data = {
+                    'success': True,
+                    'message': 'Accessible customers refreshed (no customers found)',
+                    'accessible_customers': [],
+                    'total_count': 0
+                }
+        else:
+            response_data = {
+                'success': False,
+                'error': 'Failed to refresh accessible customers'
+            }
+        
+        response = Response(response_data, status=status.HTTP_200_OK if success else status.HTTP_400_BAD_REQUEST)
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
+        
+    except Exception as e:
+        response_data = {
+            'success': False,
+            'error': str(e)
+        }
+        
+        response = Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response

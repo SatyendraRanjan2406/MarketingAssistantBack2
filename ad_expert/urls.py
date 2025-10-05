@@ -10,6 +10,22 @@ urlpatterns = [
     path('api/conversations/<int:conversation_id>/', views.get_conversation_messages, name='conversation_messages'),
     path('api/conversations/<int:conversation_id>/delete/', views.delete_conversation, name='delete_conversation'),
     
+    # RAG Chat endpoint with Intent Mapping
+    path('api/rag/chat/', views.LanggraphView.as_view(), name='rag_chat'),
+    
+    # LangChain Chat endpoint
+    path('api/langchain/chat/', views.LangChainView.as_view(), name='langchain_chat'),
+    
+    # LangGraph Chat endpoint with advanced state management
+    path('api/langgraph/chat/', views.LanggraphView.as_view(), name='langgraph_chat'),
+    
+    # Conversation History endpoints
+    path('api/conversations/history/', views.ConversationHistoryView.as_view(), name='conversation_history'),
+    path('api/conversations/history/<int:conversation_id>/', views.ConversationHistoryView.as_view(), name='conversation_detail'),
+    
+    # MCP Chat endpoint
+    path('api/chat2/', views.RAGChat2View.as_view(), name='mcp_chat'),
+    
     # OAuth endpoints
     path('api/oauth/connections/', views.get_oauth_connections, name='oauth_connections'),
     path('api/oauth/connections/<int:connection_id>/revoke/', views.revoke_oauth_connection, name='revoke_oauth'),

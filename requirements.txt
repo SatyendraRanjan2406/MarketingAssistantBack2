@@ -34,3 +34,6 @@ beautifulsoup4>=4.12.0
 requests>=2.32.0
 numpy>=1.24.0
 unstructured>=0.10.0
+langgraph>=0.6.0
+langgraph-checkpoint>=2.0.0
+langgraph-checkpoint-postgres>=2.0.0

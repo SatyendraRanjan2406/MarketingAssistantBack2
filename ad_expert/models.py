@@ -7,6 +7,9 @@ class Conversation(models.Model):
     """Chat conversation - only stores natural language messages"""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ad_expert_conversations')
     title = models.CharField(max_length=200, blank=True)
+    customer_id = models.CharField(max_length=100, blank=True, null=True, help_text="Google Ads customer ID for this conversation")
+    pending_query = models.TextField(blank=True, null=True, help_text="Query to execute after customer selection")
+    pending_intent_result = models.JSONField(null=True, blank=True, help_text="Intent mapping result to execute after customer selection")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True)

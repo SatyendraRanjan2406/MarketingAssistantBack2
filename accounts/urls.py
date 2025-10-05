@@ -23,4 +23,5 @@ urlpatterns = [
     path('api/google-oauth/connect/', views.google_oauth_connect, name='google_oauth_connect'),
     path('api/google-oauth/disconnect/', views.google_oauth_disconnect, name='google_oauth_disconnect'),
     path('api/google-oauth/ads-accounts/', views.google_ads_accounts, name='google_ads_accounts'),
+    path('api/google-oauth/refresh-customers/', views.refresh_accessible_customers, name='refresh_accessible_customers'),
 ]

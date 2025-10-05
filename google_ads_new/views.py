@@ -1219,12 +1219,7 @@ def list_accessible_customers_view(request):
                 
                 if user_auth:
                     # Update the accessible_customers field
-                    user_auth.accessible_customers = {
-                        'customers': result['customers'],
-                        'total_count': result['total_count'],
-                        'last_updated': timezone.now().isoformat(),
-                        'raw_response': result['raw_response']
-                    }
+                    user_auth.accessible_customers = result['customers']
                     user_auth.save()
                     logger.info(f"Saved {result['total_count']} accessible customers for user {request.user.id}")
                 else:

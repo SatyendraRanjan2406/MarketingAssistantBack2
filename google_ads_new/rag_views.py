@@ -14,7 +14,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from .rag_client import get_rag_client, initialize_rag_client
+from .rag_client import get_rag_client
+from .hybrid_rag_service import get_hybrid_service
 from .document_scraper import scrape_google_ads_docs
 from .vector_store import setup_vector_store
 
@@ -226,6 +227,40 @@ def api_search_documents(request):
         
     except Exception as e:
         logger.error(f"Error in api_search_documents: {e}")
+        return Response({
+            "success": False,
+            "error": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def hybrid_rag_query(request):
+    """Hybrid RAG query that combines documentation with actual API data"""
+    try:
+        data = request.data
+        query = data.get('query', '')
+        customer_id = data.get('customer_id', '')
+        
+        if not query:
+            return Response({
+                "success": False,
+                "error": "Query is required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get hybrid service
+        hybrid_service = get_hybrid_service()
+        
+        # Process query with optional customer ID
+        result = hybrid_service.process_query(
+            query=query,
+            user_id=request.user.id,
+            customer_id=customer_id
+        )
+        
+        return Response(result)
+        
+    except Exception as e:
+        logger.error(f"Error in hybrid RAG query: {e}")
         return Response({
             "success": False,
             "error": str(e)

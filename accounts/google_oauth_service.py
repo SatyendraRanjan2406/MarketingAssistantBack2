@@ -233,9 +233,15 @@ class GoogleOAuthService:
             # Refresh the credentials
             credentials.refresh(Request())
             
+            # Ensure timezone-aware datetime
+            from django.utils import timezone
+            token_expiry = credentials.expiry
+            if token_expiry and timezone.is_naive(token_expiry):
+                token_expiry = timezone.make_aware(token_expiry)
+            
             return {
                 'access_token': credentials.token,
-                'token_expiry': credentials.expiry,
+                'token_expiry': token_expiry,
             }
             
         except Exception as e:
@@ -330,6 +336,62 @@ class UserGoogleAuthService:
     """Service class for managing UserGoogleAuth model"""
     
     @staticmethod
+    def fetch_accessible_customers(access_token: str) -> dict:
+        """
+        Fetch accessible customers from Google Ads API
+        
+        Args:
+            access_token: Google OAuth access token
+            
+        Returns:
+            Dictionary containing accessible customers data
+        """
+        import requests
+        import os
+        
+        try:
+            developer_token = os.getenv('GOOGLE_ADS_DEVELOPER_TOKEN', '')
+            
+            if not developer_token:
+                logger.warning("GOOGLE_ADS_DEVELOPER_TOKEN not configured, skipping accessible customers fetch")
+                return {
+                    'customers': [],
+                    'total_count': 0,
+                    'last_updated': timezone.now().isoformat(),
+                    'raw_response': {'resourceNames': []}
+                }
+            
+            # Get accessible customers
+            customers_url = "https://googleads.googleapis.com/v21/customers:listAccessibleCustomers"
+            customers_headers = {
+                "Authorization": f"Bearer {access_token}",
+                "developer-token": developer_token
+            }
+            
+            customers_response = requests.get(customers_url, headers=customers_headers)
+            customers_response.raise_for_status()
+            customers_data = customers_response.json()
+            
+            logger.info(f"Fetched {len(customers_data.get('resourceNames', []))} accessible customers")
+            
+            return {
+                'customers': customers_data.get('resourceNames', []),
+                'total_count': len(customers_data.get('resourceNames', [])),
+                'last_updated': timezone.now().isoformat(),
+                'raw_response': customers_data
+            }
+            
+        except Exception as e:
+            logger.error(f"Error fetching accessible customers: {e}")
+            return {
+                'customers': [],
+                'total_count': 0,
+                'last_updated': timezone.now().isoformat(),
+                'raw_response': {'resourceNames': []},
+                'error': str(e)
+            }
+    
+    @staticmethod
     def create_or_update_auth(user, access_token, refresh_token, token_expiry, scopes, user_info) -> UserGoogleAuth:
         """
         Create or update Google OAuth authentication record
@@ -346,6 +408,9 @@ class UserGoogleAuthService:
             UserGoogleAuth instance
         """
         try:
+            # Fetch accessible customers for Google Ads
+            accessible_customers = UserGoogleAuthService.fetch_accessible_customers(access_token)
+            
             # Try to get existing auth record for this user and Google account
             auth_record, created = UserGoogleAuth.objects.get_or_create(
                 user=user,
@@ -357,6 +422,7 @@ class UserGoogleAuthService:
                     'scopes': scopes,
                     'google_email': user_info['google_email'],
                     'google_name': user_info['google_name'],
+                    'accessible_customers': accessible_customers,
                     'is_active': True,
                     'error_count': 0,
                     'last_error': None,
@@ -371,6 +437,7 @@ class UserGoogleAuthService:
                 auth_record.scopes = scopes
                 auth_record.google_email = user_info['google_email']
                 auth_record.google_name = user_info['google_name']
+                auth_record.accessible_customers = accessible_customers  # Update accessible customers
                 auth_record.is_active = True
                 auth_record.error_count = 0
                 auth_record.last_error = None
@@ -411,6 +478,41 @@ class UserGoogleAuthService:
         except Exception as e:
             logger.error(f"Error getting valid auth: {str(e)}")
             return None
+    
+    @staticmethod
+    def refresh_accessible_customers(user) -> bool:
+        """
+        Refresh accessible customers for a user
+        
+        Args:
+            user: Django User instance
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            auth_record = UserGoogleAuth.objects.filter(
+                user=user,
+                is_active=True
+            ).first()
+            
+            if not auth_record:
+                logger.warning(f"No active auth record found for user {user.id}")
+                return False
+            
+            # Fetch updated accessible customers
+            accessible_customers = UserGoogleAuthService.fetch_accessible_customers(auth_record.access_token)
+            
+            # Update the record
+            auth_record.accessible_customers = accessible_customers
+            auth_record.save()
+            
+            logger.info(f"Refreshed accessible customers for user {user.id}: {len(accessible_customers.get('customers', []))} customers")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error refreshing accessible customers for user {user.id}: {e}")
+            return False
     
     @staticmethod
     def refresh_user_tokens(user) -> Optional[UserGoogleAuth]:

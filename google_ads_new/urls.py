@@ -5,6 +5,7 @@ from . import chat_views
 from . import live_monitoring_views
 from . import rag_views
 from . import embedding_views
+from . import intent_mapping_views
 
 # Create router for ViewSets
 router = DefaultRouter()
@@ -93,9 +94,25 @@ urlpatterns += [
     path('api/rag/api/query/', rag_views.api_query_rag, name='api_rag_query'),
     path('api/rag/api/search/', rag_views.api_search_documents, name='api_rag_search'),
     path('api/rag/api/status/', rag_views.api_rag_status, name='api_rag_status'),
+    path('api/rag/api/hybrid/', rag_views.hybrid_rag_query, name='hybrid_rag_query'),
     
     # Embedding dashboard
     path('embedding-dashboard/', embedding_views.embedding_dashboard, name='embedding_dashboard'),
     path('api/rag/embedding-search/', embedding_views.search_embeddings, name='embedding_search'),
     path('api/rag/embedding-stats/', embedding_views.embedding_stats, name='embedding_stats'),
+]
+
+# Intent Mapping API endpoints
+urlpatterns += [
+    # Main intent mapping endpoint
+    path('api/intent-mapping/', intent_mapping_views.map_query_to_intents, name='intent_mapping'),
+    
+    # Available actions
+    path('api/intent-mapping/actions/', intent_mapping_views.get_available_actions, name='get_available_actions'),
+    path('api/intent-mapping/actions/<str:category>/', intent_mapping_views.get_actions_by_category, name='get_actions_by_category'),
+    path('api/intent-mapping/actions/details/<str:action_name>/', intent_mapping_views.get_action_details, name='get_action_details'),
+    
+    # Utility endpoints
+    path('api/intent-mapping/extract-date-range/', intent_mapping_views.extract_date_range, name='extract_date_range'),
+    path('api/intent-mapping/test/', intent_mapping_views.test_intent_mapping, name='test_intent_mapping'),
 ]

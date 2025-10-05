@@ -8,6 +8,7 @@ from typing import Dict, List, Any, Optional
 import openai
 from django.conf import settings
 from .api_tools import GoogleAdsAPITool, MetaMarketingAPITool
+from .intent_action_tools import IntentActionTools
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +20,10 @@ class LLMOrchestrator:
         self.openai_client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
         self.google_ads_tool = GoogleAdsAPITool()
         self.meta_tool = MetaMarketingAPITool()
+        self.intent_action_tools = IntentActionTools()
         
         # Tool definitions for OpenAI
-        self.tool_definitions = [
+        self.tool_definitions = self.intent_action_tools.get_tool_definitions() + [
             {
                 "type": "function",
                 "function": {
@@ -123,7 +125,7 @@ class LLMOrchestrator:
         }
     
     async def process_query(self, user_message: str, user_id: int, 
-                          conversation_context: List[Dict] = None) -> Dict[str, Any]:
+                          conversation_context: List[Dict] = None, customer_id: str = None) -> Dict[str, Any]:
         """
         Process user query with tool calling and structured outputs
         """
@@ -137,7 +139,7 @@ class LLMOrchestrator:
             # Process tool calls if any
             if response.get('tool_calls'):
                 logger.info(f"Processing {len(response['tool_calls'])} tool calls")
-                tool_results = await self._execute_tools(response['tool_calls'], user_id)
+                tool_results = await self._execute_tools(response['tool_calls'], user_id, customer_id, conversation_context)
                 
                 # Second call with tool results - format tool messages correctly
                 assistant_content = response.get('content', '') or "I'll fetch the data for you."
@@ -177,16 +179,29 @@ class LLMOrchestrator:
                 return self._format_structured_response(response)
                 
         except Exception as e:
-            logger.error(f"LLM Orchestrator error: {str(e)}")
-            return {
-                "response_type": "text",
-                "content": f"I encountered an error processing your request: {str(e)}",
-                "title": "Error"
-            }
+            error_str = str(e)
+            if "rate_limit" in error_str.lower() or "429" in error_str:
+                logger.error(f"Rate limit exceeded: {error_str}")
+                return {
+                    "response_type": "text",
+                    "content": "I'm currently experiencing high demand and have hit my rate limit. Please try again in a few minutes. I apologize for the inconvenience.",
+                    "title": "Rate Limit Exceeded",
+                    "data": [],
+                    "insights": ["Please wait 2-3 minutes before trying again", "Consider breaking down complex queries into smaller parts"]
+                }
+            else:
+                logger.error(f"LLM Orchestrator error: {error_str}")
+                return {
+                    "response_type": "text",
+                    "content": f"I encountered an error processing your request: {error_str}",
+                    "title": "Error",
+                    "data": [],
+                    "insights": []
+                }
     
     def _build_conversation_context(self, user_message: str, 
                                   conversation_context: List[Dict] = None) -> List[Dict]:
-        """Build conversation context for LLM"""
+        """Build conversation context for LLM with proper memory handling"""
         system_prompt = """You are an expert advertising co-pilot that helps users analyze their Google Ads and Meta Marketing campaigns. 
 
 Key principles:
@@ -195,6 +210,9 @@ Key principles:
 - Provide actionable insights and recommendations
 - Use the most appropriate response format (text, charts, tables, action items)
 - Focus on performance optimization and strategic guidance
+- REMEMBER previous queries and data fetched in this conversation
+- When user says "check again" or "reanalyze", use the same parameters as before
+- Maintain context of what data was previously retrieved
 
 Available tools:
 - get_google_insights: Fetch Google Ads campaign data
@@ -213,84 +231,167 @@ IMPORTANT: Always respond in valid JSON format with the following structure:
         
         messages = [{"role": "system", "content": system_prompt}]
         
-        # Add conversation context if available
+        # Add conversation context if available - include BOTH user and assistant messages
         if conversation_context:
-            for msg in conversation_context[-10:]:  # Last 10 messages for context
+            # Process conversation context to include both user and assistant messages
+            for msg in conversation_context[-20:]:  # Last 20 messages for better context
+                role = msg.get('role', 'user')
+                content = msg.get('content', '')
+                
+                # Skip empty messages
+                if not content or not content.strip():
+                    continue
+                
+                # Add the message to context
                 messages.append({
-                    "role": msg.get('role', 'user'),
-                    "content": msg.get('content', '')
+                    "role": role,
+                    "content": content
                 })
         
-        # Add "json" to the user message to satisfy OpenAI's requirement
+        # Add current user message
         user_message_with_json = f"{user_message}\n\nPlease respond in JSON format."
         messages.append({"role": "user", "content": user_message_with_json})
         return messages
     
+    def _extract_previous_tool_params(self, conversation_context: List[Dict] = None) -> Dict[str, Any]:
+        """Extract previous tool call parameters from conversation context for memory"""
+        if not conversation_context:
+            return {}
+        
+        previous_params = {}
+        
+        # Look for previous tool calls in assistant messages
+        for msg in conversation_context:
+            if msg.get('role') == 'assistant' and msg.get('content'):
+                content = msg['content']
+                
+                # Look for patterns that indicate previous tool calls
+                if 'get_google_insights' in content.lower():
+                    # Extract common parameters from previous calls
+                    if 'customerId' in content:
+                        previous_params['google_customer_id'] = self._extract_param_value(content, 'customerId')
+                    if 'dateRange' in content:
+                        previous_params['google_date_range'] = self._extract_param_value(content, 'dateRange')
+                    if 'segments' in content:
+                        previous_params['google_segments'] = self._extract_param_value(content, 'segments')
+                
+                if 'get_meta_insights' in content.lower():
+                    if 'dateRange' in content:
+                        previous_params['meta_date_range'] = self._extract_param_value(content, 'dateRange')
+                    if 'breakdowns' in content:
+                        previous_params['meta_breakdowns'] = self._extract_param_value(content, 'breakdowns')
+        
+        return previous_params
+    
+    def _extract_param_value(self, content: str, param_name: str) -> str:
+        """Extract parameter value from content string"""
+        import re
+        pattern = rf'{param_name}["\']?\s*:\s*["\']?([^"\'}}]+)["\']?'
+        match = re.search(pattern, content, re.IGNORECASE)
+        return match.group(1).strip() if match else None
+    
     async def _call_llm_with_tools(self, messages: List[Dict]) -> Dict[str, Any]:
-        """Call LLM with tool calling enabled"""
-        try:
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                tools=self.tool_definitions,
-                tool_choice="auto",
-                temperature=0.1
-            )
-            
-            message = response.choices[0].message
-            content = message.content or ""
-            tool_calls = message.tool_calls or []
-            
-            # Parse tool calls properly
-            parsed_tool_calls = []
-            for tc in tool_calls:
-                try:
-                    parsed_tool_calls.append({
-                        "id": tc.id,
-                        "name": tc.function.name,
-                        "arguments": json.loads(tc.function.arguments)
-                    })
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse tool call arguments: {e}")
-                    continue
-            
-            return {
-                "content": content,
-                "tool_calls": parsed_tool_calls
-            }
-            
-        except Exception as e:
-            logger.error(f"OpenAI API error: {str(e)}")
-            raise
+        """Call LLM with tool calling enabled and rate limiting"""
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=messages,
+                    tools=self.tool_definitions,
+                    tool_choice="auto",
+                    temperature=0.1
+                )
+                break  # Success, exit retry loop
+                
+            except Exception as e:
+                error_str = str(e)
+                if "rate_limit" in error_str.lower() or "429" in error_str:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Rate limit hit, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    else:
+                        logger.error(f"Rate limit exceeded after {max_retries} attempts")
+                        raise
+                else:
+                    logger.error(f"OpenAI API error: {e}")
+                    raise
+        
+        # Process successful response
+        message = response.choices[0].message
+        content = message.content or ""
+        tool_calls = message.tool_calls or []
+        
+        # Parse tool calls properly
+        parsed_tool_calls = []
+        for tc in tool_calls:
+            try:
+                parsed_tool_calls.append({
+                    "id": tc.id,
+                    "name": tc.function.name,
+                    "arguments": json.loads(tc.function.arguments)
+                })
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse tool call arguments: {e}")
+                continue
+        
+        return {
+            "content": content,
+            "tool_calls": parsed_tool_calls
+        }
     
     async def _call_llm_final(self, messages: List[Dict]) -> Dict[str, Any]:
-        """Final LLM call with tool results"""
-        try:
-            # Create a new messages list with JSON instruction at the beginning
-            final_messages = [
-                {
-                    "role": "system", 
-                    "content": "Please provide your final response in valid JSON format with response_type, title, content, data, and insights fields. Always respond in JSON format."
-                }
-            ] + messages
-            
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=final_messages,
-                response_format={"type": "json_object"},
-                temperature=0.1
-            )
-            
-            content = response.choices[0].message.content or "{}"
-            return json.loads(content)
-            
-        except Exception as e:
-            logger.error(f"OpenAI final call error: {str(e)}")
-            raise
+        """Final LLM call with tool results and rate limiting"""
+        max_retries = 3
+        retry_delay = 2
+        
+        # Create a new messages list with JSON instruction at the beginning
+        final_messages = [
+            {
+                "role": "system", 
+                "content": "Please provide your final response in valid JSON format with response_type, title, content, data, and insights fields. Always respond in JSON format."
+            }
+        ] + messages
+        
+        for attempt in range(max_retries):
+            try:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=final_messages,
+                    response_format={"type": "json_object"},
+                    temperature=0.1
+                )
+                break  # Success, exit retry loop
+                
+            except Exception as e:
+                error_str = str(e)
+                if "rate_limit" in error_str.lower() or "429" in error_str:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Rate limit hit on final call, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    else:
+                        logger.error(f"Rate limit exceeded on final call after {max_retries} attempts")
+                        raise
+                else:
+                    logger.error(f"OpenAI final call error: {e}")
+                    raise
+        
+        # Process successful response
+        content = response.choices[0].message.content or "{}"
+        return json.loads(content)
     
-    async def _execute_tools(self, tool_calls: List[Dict], user_id: int) -> Dict[str, Any]:
-        """Execute tool calls and return results"""
+    async def _execute_tools(self, tool_calls: List[Dict], user_id: int, customer_id: str = None, conversation_context: List[Dict] = None) -> Dict[str, Any]:
+        """Execute tool calls and return results with memory enhancement"""
         results = {}
+        
+        # Extract previous tool call parameters from conversation context for memory
+        previous_tool_params = self._extract_previous_tool_params(conversation_context)
         
         for tool_call in tool_calls:
             try:
@@ -311,8 +412,15 @@ IMPORTANT: Always respond in valid JSON format with the following structure:
                         }
                         continue
                     
-                    # Get valid access token (will refresh if needed)
-                    access_token = await sync_to_async(UserGoogleAuthService.get_or_refresh_valid_token)(user)
+                    # Get valid access token (will refresh if needed) - handle async context properly
+                    try:
+                        access_token = await sync_to_async(UserGoogleAuthService.get_or_refresh_valid_token)(user)
+                    except Exception as oauth_error:
+                        logger.error(f"OAuth error: {oauth_error}")
+                        results[tool_call['id']] = {
+                            "error": "Google Ads account not connected. Please connect your Google Ads account first."
+                        }
+                        continue
                     
                     if not access_token:
                         results[tool_call['id']] = {
@@ -320,28 +428,56 @@ IMPORTANT: Always respond in valid JSON format with the following structure:
                         }
                         continue
                     
-                    # Get Google Ads customer ID
-                    customer_id = await sync_to_async(UserGoogleAuthService.get_google_ads_customer_id)(user)
+                    # Use provided customer ID or get from user's account
                     if not customer_id:
-                        results[tool_call['id']] = {
-                            "error": "No Google Ads customer ID found. Please ensure your Google Ads account is properly connected."
-                        }
-                        continue
+                        customer_id = await sync_to_async(UserGoogleAuthService.get_google_ads_customer_id)(user)
+                        if not customer_id:
+                            results[tool_call['id']] = {
+                                "error": "No Google Ads customer ID found. Please ensure your Google Ads account is properly connected."
+                            }
+                            continue
+                    
+                    # Use previous parameters if available and current arguments are missing
+                    final_customer_id = arguments.get('customerId', previous_tool_params.get('google_customer_id', customer_id))
+                    final_date_range = arguments.get('dateRange', previous_tool_params.get('google_date_range', 'LAST_14_DAYS'))
+                    final_segments = arguments.get('segments', previous_tool_params.get('google_segments', None))
                     
                     result = await self.google_ads_tool.get_insights(
-                        customer_id=arguments.get('customerId', customer_id),
+                        customer_id=final_customer_id,
                         access_token=access_token,
-                        date_range=arguments.get('dateRange', 'LAST_14_DAYS'),
-                        segments=arguments.get('segments', []),
+                        date_range=final_date_range,
+                        segments=arguments.get('segments', final_segments or []),
                         user_id=user_id
                     )
                     results[tool_call['id']] = result
                 
                 elif tool_name == 'get_meta_insights':
+                    # Use previous parameters if available
+                    final_date_range = arguments.get('dateRange', previous_tool_params.get('meta_date_range', 'LAST_14_DAYS'))
+                    final_breakdowns = arguments.get('breakdowns', previous_tool_params.get('meta_breakdowns', None))
+                    
                     # Meta OAuth not yet centralized - return error for now
                     results[tool_call['id']] = {
-                        "error": "Meta Marketing API integration is not yet available. Please use Google Ads for now."
+                        "error": "Meta Marketing API integration is not yet available. Please use Google Ads for now.",
+                        "note": f"Would have used date_range: {final_date_range}, breakdowns: {final_breakdowns}"
                     }
+                else:
+                    # Check if it's an intent action tool
+                    intent_tool = self.intent_action_tools.get_tool_by_name(tool_name)
+                    if intent_tool:
+                        # Add customer ID to parameters if available
+                        parameters = arguments.copy()
+                        if customer_id and not parameters.get('customer_id'):
+                            parameters['customer_id'] = customer_id
+                        
+                        # Execute intent action tool
+                        result = await sync_to_async(self.intent_action_tools.execute_action)(
+                            action_name=tool_name.upper(),
+                            parameters=parameters
+                        )
+                        results[tool_call['id']] = result
+                    else:
+                        results[tool_call['id']] = {"error": f"Unknown tool: {tool_name}"}
                 
             except Exception as e:
                 logger.error(f"Tool execution error for {tool_call['name']}: {str(e)}")

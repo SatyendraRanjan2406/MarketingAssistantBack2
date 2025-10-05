@@ -40,14 +40,14 @@ def create_google_ads_account():
         
         # Get account details from environment
         customer_id = os.getenv('GOOGLE_ADS_CUSTOMER_ID')
-        login_customer_id = os.getenv('GOOGLE_ADS_LOGIN_CUSTOMER_ID')
+        # login_customer_id = os.getenv('GOOGLE_ADS_LOGIN_CUSTOMER_ID')
         
         if not customer_id:
             print("❌ GOOGLE_ADS_CUSTOMER_ID not found in environment")
             return
         
         print(f"🔍 Customer ID from .env: {customer_id}")
-        print(f"🔍 Login Customer ID from .env: {login_customer_id}")
+        # print(f"🔍 Login Customer ID from .env: {login_customer_id}")
         
         # Create the account
         account = GoogleAdsAccount.objects.create(
