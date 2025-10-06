@@ -124,3 +124,4 @@ cryptography>=3.4.8,<44.0.0
 # MSAL (for Microsoft authentication if needed)
 msal==1.26.0
 
+
