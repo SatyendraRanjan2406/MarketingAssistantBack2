@@ -34,9 +34,9 @@ urlpatterns = [
     
     # OAuth endpoints
     path('api/oauth/connections/', views.get_oauth_connections, name='oauth_connections'),
-    path('api/oauth/connections/<int:connection_id>/revoke/', views.revoke_oauth_connection, name='revoke_oauth'),
+    # path('api/oauth/connections/<int:connection_id>/revoke/', views.revoke_oauth_connection, name='revoke_oauth'),
     
-    # Health check and test endpoints
-    path('api/health/', views.health_check, name='health_check'),
-    path('api/test-auth/', views.test_auth, name='test_auth'),
+#     # Health check and test endpoints
+#     path('api/health/', views.health_check, name='health_check'),
+#     path('api/test-auth/', views.test_auth, name='test_auth'),
 ]

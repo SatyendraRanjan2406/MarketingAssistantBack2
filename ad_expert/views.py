@@ -152,136 +152,133 @@ logger = logging.getLogger(__name__)
 #         )
 
 
-# @api_view(['GET'])
-# @permission_classes([IsAuthenticated])
-# def get_conversations(request):
-#     """Get user's conversations"""
-#     try:
-#         conversations = Conversation.objects.filter(
-#             user=request.user,
-#             deleted_at__isnull=True
-#         ).order_by('-updated_at')[:20]
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_conversations(request):
+    """Get user's conversations"""
+    try:
+        conversations = Conversation.objects.filter(
+            user=request.user,
+            deleted_at__isnull=True
+        ).order_by('-updated_at')[:20]
         
-#         data = []
-#         for conv in conversations:
-#             data.append({
-#                 'id': conv.id,
-#                 'title': conv.title,
-#                 'created_at': conv.created_at.isoformat(),
-#                 'updated_at': conv.updated_at.isoformat(),
-#                 'message_count': conv.messages.count()
-#             })
+        data = []
+        for conv in conversations:
+            data.append({
+                'id': conv.id,
+                'title': conv.title,
+                'created_at': conv.created_at.isoformat(),
+                'updated_at': conv.updated_at.isoformat(),
+                'message_count': conv.messages.count()
+            })
         
-#         return Response(data)
+        return Response(data)
         
-#     except Exception as e:
-#         logger.error(f"Get conversations error: {str(e)}")
-#         return Response({
-#             'error': 'Failed to fetch conversations'
-#         }, status=500)
+    except Exception as e:
+        logger.error(f"Get conversations error: {str(e)}")
+        return Response({
+            'error': 'Failed to fetch conversations'
+        }, status=500)
 
 
-# @api_view(['GET'])
-# @permission_classes([IsAuthenticated])
-# def get_conversation_messages(request, conversation_id):
-#     """Get messages for a specific conversation"""
-#     try:
-#         conversation = Conversation.objects.get(
-#             id=conversation_id,
-#             user=request.user,
-#             deleted_at__isnull=True
-#         )
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_conversation_messages(request, conversation_id):
+    """Get messages for a specific conversation"""
+    try:
+        conversation = Conversation.objects.get(
+            id=conversation_id,
+            user=request.user,
+            deleted_at__isnull=True
+        )
         
-#         messages = conversation.messages.order_by('created_at')
-#         data = []
+        messages = conversation.messages.order_by('created_at')
+        data = []
         
-#         for msg in messages:
-#             data.append({
-#                 'id': msg.id,
-#                 'role': msg.role,
-#                 'content': msg.content,
-#                 'response_type': msg.response_type,
-#                 'structured_data': msg.structured_data,
-#                 'created_at': msg.created_at.isoformat()
-#             })
+        for msg in messages:
+            data.append({
+                'id': msg.id,
+                'role': msg.role,
+                'content': msg.content,
+                'response_type': msg.response_type,
+                'structured_data': msg.structured_data,
+                'created_at': msg.created_at.isoformat()
+            })
         
-#         return Response(data)
+        return Response(data)
         
-#     except Conversation.DoesNotExist:
-#         return Response({
-#             'error': 'Conversation not found'
-#         }, status=404)
-#     except Exception as e:
-#         logger.error(f"Get messages error: {str(e)}")
-#         return Response({
-#             'error': 'Failed to fetch messages'
-#         }, status=500)
+    except Conversation.DoesNotExist:
+        return Response({
+            'error': 'Conversation not found'
+        }, status=404)
+    except Exception as e:
+        logger.error(f"Get messages error: {str(e)}")
+        return Response({
+            'error': 'Failed to fetch messages'
+        }, status=500)
 
 
-# @api_view(['DELETE'])
-# @permission_classes([IsAuthenticated])
-# def delete_conversation(request, conversation_id):
-#     """Soft delete a conversation"""
-#     try:
-#         conversation = Conversation.objects.get(
-#             id=conversation_id,
-#             user=request.user,
-#             deleted_at__isnull=True
-#         )
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_conversation(request, conversation_id):
+    """Soft delete a conversation"""
+    try:
+        conversation = Conversation.objects.get(
+            id=conversation_id,
+            user=request.user,
+            deleted_at__isnull=True
+        )
         
-        # Soft delete
-#         conversation.deleted_at = datetime.now()
-#         conversation.save()
+        conversation.deleted_at = datetime.now()
+        conversation.save()
+ 
+        conversation.messages.all().delete()
+        conversation.delete()
         
-        # Schedule hard delete job (in production, use Celery)
-        # For now, we'll do it immediately
-#         conversation.messages.all().delete()
-#         conversation.delete()
+        return Response({
+            'message': 'Conversation deleted successfully'
+        })
         
-#         return Response({
-#             'message': 'Conversation deleted successfully'
-#         })
-        
-#     except Conversation.DoesNotExist:
-#         return Response({
-#             'error': 'Conversation not found'
-#         }, status=404)
-#     except Exception as e:
-#         logger.error(f"Delete conversation error: {str(e)}")
-#         return Response({
-#             'error': 'Failed to delete conversation'
-#         }, status=500)
+    except Conversation.DoesNotExist:
+        return Response({
+            'error': 'Conversation not found'
+        }, status=404)
+    except Exception as e:
+        logger.error(f"Delete conversation error: {str(e)}")
+        return Response({
+            'error': 'Failed to delete conversation'
+        }, status=500)
 
 
-# @api_view(['GET'])
-# @permission_classes([IsAuthenticated])
-# def get_oauth_connections(request):
-#     """Get user's OAuth connections from accounts app"""
-#     try:
-#         from accounts.google_oauth_service import UserGoogleAuthService
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_oauth_connections(request):
+    """Get user's OAuth connections from accounts app"""
+    try:
+        from accounts.google_oauth_service import UserGoogleAuthService
         
         # Get Google OAuth connections
-#         google_accounts = UserGoogleAuthService.get_user_google_accounts(request.user)
+        google_accounts = UserGoogleAuthService.get_user_google_accounts(request.user)
         
-#         data = []
-#         for account in google_accounts:
-#             data.append({
-#                 'id': account['id'],
-#                 'platform': 'google',
-#                 'account_id': account['google_ads_customer_id'],
-#                 'email': account['google_email'],
-#                 'name': account['google_name'],
-#                 'created_at': account['last_used'].isoformat(),
-#                 'is_token_valid': account['is_token_valid']
-#             })
+        data = []
+        for account in google_accounts:
+            data.append({
+                'id': account['id'],
+                'platform': 'google',
+                'account_id': account['google_ads_customer_id'],
+                'email': account['google_email'],
+                'name': account['google_name'],
+                'created_at': account['last_used'].isoformat(),
+                'is_token_valid': account['is_token_valid']
+            })
         
-#         return Response(data)
+        return Response(data)
         
-#     except Exception as e:
-#         logger.error(f"Get OAuth connections error: {str(e)}")
-#         return Response({
-#             'error': 'Failed to fetch connections'
-#         }, status=500)
+    except Exception as e:
+        logger.error(f"Get OAuth connections error: {str(e)}")
+        return Response({
+            'error': 'Failed to fetch connections'
+        }, status=500)
 
 
 # @api_view(['DELETE'])
