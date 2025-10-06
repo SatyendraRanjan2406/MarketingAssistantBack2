@@ -3083,3 +3083,142 @@ class RecentConversationsView(APIView):
                 'error': 'Failed to retrieve recent conversations',
                 'details': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ChatHistoryView(APIView):
+    """
+    API endpoint to get chat messages for a specific conversation with pagination
+    - Returns latest 100 messages by default
+    - Supports pagination with page and page_size parameters
+    - Only returns messages for conversations owned by the authenticated user
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, conversation_id):
+        """
+        Get chat messages for a specific conversation with pagination
+        
+        GET /ad-expert/api/conversations/{conversation_id}/messages/
+        
+        Query Parameters:
+        - page: Page number (default: 1)
+        - page_size: Number of messages per page (default: 50, max: 100)
+        - order: Order of messages ('asc' for oldest first, 'desc' for newest first, default: 'desc')
+        
+        Response:
+        {
+            "success": true,
+            "conversation_id": 123,
+            "messages": [...],
+            "pagination": {
+                "current_page": 1,
+                "page_size": 50,
+                "total_messages": 150,
+                "total_pages": 3,
+                "has_next": true,
+                "has_previous": false
+            }
+        }
+        """
+        try:
+            user = request.user
+            
+            # Get pagination parameters
+            page = int(request.GET.get('page', 1))
+            page_size = min(int(request.GET.get('page_size', 50)), 100)  # Max 100 messages per page
+            order = request.GET.get('order', 'desc')  # 'asc' or 'desc'
+            
+            # Validate page number
+            if page < 1:
+                page = 1
+            
+            # Get the conversation and verify ownership
+            try:
+                conversation = Conversation.objects.get(
+                    id=conversation_id,
+                    user=user
+                )
+            except Conversation.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'error': 'Conversation not found or access denied',
+                    'conversation_id': conversation_id
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get total count of messages for this conversation
+            total_messages = ChatMessage.objects.filter(conversation=conversation).count()
+            
+            # Calculate pagination
+            total_pages = (total_messages + page_size - 1) // page_size
+            offset = (page - 1) * page_size
+            
+            # Determine ordering
+            order_field = 'created_at' if order == 'asc' else '-created_at'
+            
+            # Get messages with pagination
+            messages = ChatMessage.objects.filter(
+                conversation=conversation
+            ).order_by(order_field)[offset:offset + page_size]
+            
+            # Format messages for response
+            messages_data = []
+            for message in messages:
+                message_data = {
+                    'id': message.id,
+                    'role': message.role,
+                    'content': message.content,
+                    'response_type': message.response_type,
+                    'created_at': message.created_at.isoformat(),
+                    'updated_at': message.updated_at.isoformat() if message.updated_at else None
+                }
+                
+                # Include structured data if available
+                if message.structured_data:
+                    message_data['structured_data'] = message.structured_data
+                
+                messages_data.append(message_data)
+            
+            # If order is 'desc', reverse the list to show newest first
+            if order == 'desc':
+                messages_data.reverse()
+            
+            # Calculate pagination info
+            has_next = page < total_pages
+            has_previous = page > 1
+            
+            response_data = {
+                'success': True,
+                'conversation_id': conversation_id,
+                'conversation_title': conversation.title,
+                'messages': messages_data,
+                'pagination': {
+                    'current_page': page,
+                    'page_size': page_size,
+                    'total_messages': total_messages,
+                    'total_pages': total_pages,
+                    'has_next': has_next,
+                    'has_previous': has_previous,
+                    'next_page': page + 1 if has_next else None,
+                    'previous_page': page - 1 if has_previous else None
+                }
+            }
+            
+            logger.info(f"Retrieved {len(messages_data)} messages for conversation {conversation_id} (page {page}/{total_pages}) for user {user.id}")
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            logger.error(f"Invalid pagination parameters: {str(e)}")
+            return Response({
+                'success': False,
+                'error': 'Invalid pagination parameters',
+                'details': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            logger.error(f"Error getting chat history: {str(e)}")
+            return Response({
+                'success': False,
+                'error': 'Failed to retrieve chat history',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
