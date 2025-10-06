@@ -531,13 +531,29 @@ def get_performance_data(customer_id: str, access_token: str, date_range: str = 
     Args:
         customer_id: Google Ads customer ID
         access_token: OAuth2 access token
-        date_range: Date range (LAST_7_DAYS, LAST_30_DAYS, LAST_90_DAYS, etc.)
+        date_range: Date range (YESTERDAY, TODAY, LAST_7_DAYS, LAST_30_DAYS, LAST_90_DAYS, THIS_MONTH, LAST_MONTH, etc.)
         campaign_id: Optional campaign ID to filter
         ad_group_id: Optional ad group ID to filter
     
     Returns:
         Performance metrics and data
     """
+    # Validate and normalize date_range
+    valid_date_ranges = {
+        'YESTERDAY', 'TODAY', 'LAST_7_DAYS', 'LAST_14_DAYS', 'LAST_30_DAYS', 
+        'LAST_90_DAYS', 'THIS_MONTH', 'LAST_MONTH', 'THIS_QUARTER', 
+        'LAST_QUARTER', 'THIS_YEAR', 'LAST_YEAR'
+    }
+    
+    # Handle common invalid date ranges
+    original_date_range = date_range
+    if date_range.upper() == 'ALL_TIME':
+        date_range = 'LAST_90_DAYS'  # Use 90 days as a reasonable default for "all time"
+        logger.warning(f"Invalid date range '{original_date_range}' converted to '{date_range}'")
+    elif date_range.upper() not in valid_date_ranges:
+        date_range = 'LAST_30_DAYS'  # Default fallback
+        logger.warning(f"Invalid date range '{original_date_range}' converted to '{date_range}'")
+    
     try:
         if ad_group_id:
             # Ad group level performance

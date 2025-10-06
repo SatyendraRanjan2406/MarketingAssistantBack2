@@ -23,8 +23,11 @@ urlpatterns = [
     path('api/conversations/history/', views.ConversationHistoryView.as_view(), name='conversation_history'),
     path('api/conversations/history/<int:conversation_id>/', views.ConversationHistoryView.as_view(), name='conversation_detail'),
     
-    # MCP Chat endpoint
-    path('api/chat2/', views.RAGChat2View.as_view(), name='mcp_chat'),
+    # Recent Conversations endpoint for frontend
+    path('api/conversations/recent/', views.RecentConversationsView.as_view(), name='recent_conversations'),
+    
+    # MCP Chat endpoint - COMMENTED OUT (view not used)
+    # path('api/chat2/', views.RAGChat2View.as_view(), name='mcp_chat'),
     
     # OAuth endpoints
     path('api/oauth/connections/', views.get_oauth_connections, name='oauth_connections'),
