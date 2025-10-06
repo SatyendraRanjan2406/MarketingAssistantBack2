@@ -1,0 +1,62 @@
+# Minimal requirements for core functionality only
+# Used by: Django, accounts, LanggraphView, tools
+
+# Django Core
+Django==5.2.5
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+djangorestframework-simplejwt==5.3.0
+
+# Database
+psycopg2-binary==2.9.9
+
+# Google Ads API
+google-ads==28.0.0
+google-auth==2.40.3
+google-auth-oauthlib==1.2.2
+google-api-core==2.25.1
+
+# HTTP Requests
+requests==2.32.4
+
+# Environment
+python-dotenv==1.0.0
+
+# Protobuf (required by Google APIs)
+protobuf>=5.0.0,<7.0.0
+
+# Redis (for caching)
+redis==5.0.1
+
+# Celery (for background tasks)
+celery==5.3.4
+
+# Image processing
+Pillow==10.1.0
+
+# Data processing
+pandas>=2.3.0
+numpy>=2.3.0
+
+# LangGraph and LangChain (for LanggraphView)
+langgraph>=0.6.0
+langgraph-checkpoint>=2.0.0
+langgraph-checkpoint-postgres>=2.0.0
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langchain-community>=0.0.10
+
+# OpenAI (for LLM)
+openai>=1.0.0
+tiktoken>=0.5.0
+
+# Data visualization (for tools)
+matplotlib>=3.8.0
+seaborn>=0.13.0
+plotly>=6.0.0
+
+# Cryptography (compatible with msal)
+cryptography>=3.4.8,<44.0.0
+
+# MSAL (for Microsoft authentication if needed)
+msal==1.26.0

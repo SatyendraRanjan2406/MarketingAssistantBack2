@@ -39,299 +39,299 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 logger = logging.getLogger(__name__)
 
 
-class ChatBotView(APIView):
-    """
-    Main ChatBot API endpoint - privacy-first design
-    - No campaign data at rest
-    - In-memory analytics only
-    - User-controlled chat history
-    """
-    authentication_classes = [JWTAuthentication, SessionAuthentication]
-    permission_classes = [IsAuthenticated]
+# class ChatBotView(APIView):
+#     """
+#     Main ChatBot API endpoint - privacy-first design
+#     - No campaign data at rest
+#     - In-memory analytics only
+#     - User-controlled chat history
+#     """
+#     authentication_classes = [JWTAuthentication, SessionAuthentication]
+#     permission_classes = [IsAuthenticated]
     
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.llm_orchestrator = LLMOrchestrator()
+#     def __init__(self, **kwargs):
+#         super().__init__(**kwargs)
+#         self.llm_orchestrator = LLMOrchestrator()
     
-    def post(self, request):
-        """Handle chat messages with streaming response"""
-        try:
-            message = request.data.get('message', '').strip()
-            conversation_id = request.data.get('conversation_id')
+#     def post(self, request):
+#         """Handle chat messages with streaming response"""
+#         try:
+#             message = request.data.get('message', '').strip()
+#             conversation_id = request.data.get('conversation_id')
             
-            if not message:
-                return Response({
-                    'error': 'Message is required'
-                }, status=status.HTTP_400_BAD_REQUEST)
+#             if not message:
+#                 return Response({
+#                     'error': 'Message is required'
+#                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Get or create conversation
-            conversation = self._get_or_create_conversation(request.user, conversation_id)
+#             conversation = self._get_or_create_conversation(request.user, conversation_id)
             
             # Save user message
-            user_message = ChatMessage.objects.create(
-                conversation=conversation,
-                role='user',
-                content=message
-            )
+#             user_message = ChatMessage.objects.create(
+#                 conversation=conversation,
+#                 role='user',
+#                 content=message
+#             )
             
             # Get conversation context (last 20 messages) - include BOTH user and assistant messages
-            context_messages = list(
-                conversation.messages.order_by('-created_at')[:20].values(
-                    'role', 'content', 'created_at', 'response_type', 'structured_data'
-                )
-            )
-            context_messages.reverse()
+#             context_messages = list(
+#                 conversation.messages.order_by('-created_at')[:20].values(
+#                     'role', 'content', 'created_at', 'response_type', 'structured_data'
+#                 )
+#             )
+#             context_messages.reverse()
             
             # Enhance context with structured data for better memory
-            enhanced_context = []
-            for msg in context_messages:
-                enhanced_msg = {
-                    'role': msg['role'],
-                    'content': msg['content'],
-                    'created_at': msg['created_at']
-                }
+#             enhanced_context = []
+#             for msg in context_messages:
+#                 enhanced_msg = {
+#                     'role': msg['role'],
+#                     'content': msg['content'],
+#                     'created_at': msg['created_at']
+#                 }
                 
                 # Add structured data context for assistant messages
-                if msg['role'] == 'assistant' and msg['structured_data']:
-                    enhanced_msg['data_context'] = f"Previous response included: {msg['response_type']} with {len(msg['structured_data'])} data points"
+#                 if msg['role'] == 'assistant' and msg['structured_data']:
+#                     enhanced_msg['data_context'] = f"Previous response included: {msg['response_type']} with {len(msg['structured_data'])} data points"
                 
-                enhanced_context.append(enhanced_msg)
+#                 enhanced_context.append(enhanced_msg)
             
-            context_messages = enhanced_context
+#             context_messages = enhanced_context
             
             # Process with LLM orchestrator
-            import asyncio
-            response_data = asyncio.run(self.llm_orchestrator.process_query(
-                user_message=message,
-                user_id=request.user.id,
-                conversation_context=context_messages
-            ))
+#             import asyncio
+#             response_data = asyncio.run(self.llm_orchestrator.process_query(
+#                 user_message=message,
+#                 user_id=request.user.id,
+#                 conversation_context=context_messages
+#             ))
             
             # Save assistant response
-            assistant_message = ChatMessage.objects.create(
-                conversation=conversation,
-                role='assistant',
-                content=response_data.get('content', ''),
-                response_type=response_data.get('response_type', 'text'),
-                structured_data=response_data.get('data', [])
-            )
+#             assistant_message = ChatMessage.objects.create(
+#                 conversation=conversation,
+#                 role='assistant',
+#                 content=response_data.get('content', ''),
+#                 response_type=response_data.get('response_type', 'text'),
+#                 structured_data=response_data.get('data', [])
+#             )
             
             # Update conversation timestamp
-            conversation.updated_at = datetime.now()
-            conversation.save()
+#             conversation.updated_at = datetime.now()
+#             conversation.save()
             
-            return Response({
-                'message_id': assistant_message.id,
-                'conversation_id': conversation.id,
-                'response': response_data,
-                'timestamp': assistant_message.created_at.isoformat()
-            })
+#             return Response({
+#                 'message_id': assistant_message.id,
+#                 'conversation_id': conversation.id,
+#                 'response': response_data,
+#                 'timestamp': assistant_message.created_at.isoformat()
+#             })
             
-        except Exception as e:
-            logger.error(f"ChatBot error: {str(e)}")
-            return Response({
-                'error': 'Internal server error'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#         except Exception as e:
+#             logger.error(f"ChatBot error: {str(e)}")
+#             return Response({
+#                 'error': 'Internal server error'
+#             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    def _get_or_create_conversation(self, user, conversation_id=None):
-        """Get existing conversation or create new one"""
-        if conversation_id:
-            try:
-                return Conversation.objects.get(
-                    id=conversation_id,
-                    user=user,
-                    deleted_at__isnull=True
-                )
-            except Conversation.DoesNotExist:
-                pass
+#     def _get_or_create_conversation(self, user, conversation_id=None):
+#         """Get existing conversation or create new one"""
+#         if conversation_id:
+#             try:
+#                 return Conversation.objects.get(
+#                     id=conversation_id,
+#                     user=user,
+#                     deleted_at__isnull=True
+#                 )
+#             except Conversation.DoesNotExist:
+#                 pass
         
         # Create new conversation
-        return Conversation.objects.create(
-            user=user,
-            title=f"Chat {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-        )
+#         return Conversation.objects.create(
+#             user=user,
+#             title=f"Chat {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+#         )
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_conversations(request):
-    """Get user's conversations"""
-    try:
-        conversations = Conversation.objects.filter(
-            user=request.user,
-            deleted_at__isnull=True
-        ).order_by('-updated_at')[:20]
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def get_conversations(request):
+#     """Get user's conversations"""
+#     try:
+#         conversations = Conversation.objects.filter(
+#             user=request.user,
+#             deleted_at__isnull=True
+#         ).order_by('-updated_at')[:20]
         
-        data = []
-        for conv in conversations:
-            data.append({
-                'id': conv.id,
-                'title': conv.title,
-                'created_at': conv.created_at.isoformat(),
-                'updated_at': conv.updated_at.isoformat(),
-                'message_count': conv.messages.count()
-            })
+#         data = []
+#         for conv in conversations:
+#             data.append({
+#                 'id': conv.id,
+#                 'title': conv.title,
+#                 'created_at': conv.created_at.isoformat(),
+#                 'updated_at': conv.updated_at.isoformat(),
+#                 'message_count': conv.messages.count()
+#             })
         
-        return Response(data)
+#         return Response(data)
         
-    except Exception as e:
-        logger.error(f"Get conversations error: {str(e)}")
-        return Response({
-            'error': 'Failed to fetch conversations'
-        }, status=500)
+#     except Exception as e:
+#         logger.error(f"Get conversations error: {str(e)}")
+#         return Response({
+#             'error': 'Failed to fetch conversations'
+#         }, status=500)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_conversation_messages(request, conversation_id):
-    """Get messages for a specific conversation"""
-    try:
-        conversation = Conversation.objects.get(
-            id=conversation_id,
-            user=request.user,
-            deleted_at__isnull=True
-        )
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def get_conversation_messages(request, conversation_id):
+#     """Get messages for a specific conversation"""
+#     try:
+#         conversation = Conversation.objects.get(
+#             id=conversation_id,
+#             user=request.user,
+#             deleted_at__isnull=True
+#         )
         
-        messages = conversation.messages.order_by('created_at')
-        data = []
+#         messages = conversation.messages.order_by('created_at')
+#         data = []
         
-        for msg in messages:
-            data.append({
-                'id': msg.id,
-                'role': msg.role,
-                'content': msg.content,
-                'response_type': msg.response_type,
-                'structured_data': msg.structured_data,
-                'created_at': msg.created_at.isoformat()
-            })
+#         for msg in messages:
+#             data.append({
+#                 'id': msg.id,
+#                 'role': msg.role,
+#                 'content': msg.content,
+#                 'response_type': msg.response_type,
+#                 'structured_data': msg.structured_data,
+#                 'created_at': msg.created_at.isoformat()
+#             })
         
-        return Response(data)
+#         return Response(data)
         
-    except Conversation.DoesNotExist:
-        return Response({
-            'error': 'Conversation not found'
-        }, status=404)
-    except Exception as e:
-        logger.error(f"Get messages error: {str(e)}")
-        return Response({
-            'error': 'Failed to fetch messages'
-        }, status=500)
+#     except Conversation.DoesNotExist:
+#         return Response({
+#             'error': 'Conversation not found'
+#         }, status=404)
+#     except Exception as e:
+#         logger.error(f"Get messages error: {str(e)}")
+#         return Response({
+#             'error': 'Failed to fetch messages'
+#         }, status=500)
 
 
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def delete_conversation(request, conversation_id):
-    """Soft delete a conversation"""
-    try:
-        conversation = Conversation.objects.get(
-            id=conversation_id,
-            user=request.user,
-            deleted_at__isnull=True
-        )
+# @api_view(['DELETE'])
+# @permission_classes([IsAuthenticated])
+# def delete_conversation(request, conversation_id):
+#     """Soft delete a conversation"""
+#     try:
+#         conversation = Conversation.objects.get(
+#             id=conversation_id,
+#             user=request.user,
+#             deleted_at__isnull=True
+#         )
         
         # Soft delete
-        conversation.deleted_at = datetime.now()
-        conversation.save()
+#         conversation.deleted_at = datetime.now()
+#         conversation.save()
         
         # Schedule hard delete job (in production, use Celery)
         # For now, we'll do it immediately
-        conversation.messages.all().delete()
-        conversation.delete()
+#         conversation.messages.all().delete()
+#         conversation.delete()
         
-        return Response({
-            'message': 'Conversation deleted successfully'
-        })
+#         return Response({
+#             'message': 'Conversation deleted successfully'
+#         })
         
-    except Conversation.DoesNotExist:
-        return Response({
-            'error': 'Conversation not found'
-        }, status=404)
-    except Exception as e:
-        logger.error(f"Delete conversation error: {str(e)}")
-        return Response({
-            'error': 'Failed to delete conversation'
-        }, status=500)
+#     except Conversation.DoesNotExist:
+#         return Response({
+#             'error': 'Conversation not found'
+#         }, status=404)
+#     except Exception as e:
+#         logger.error(f"Delete conversation error: {str(e)}")
+#         return Response({
+#             'error': 'Failed to delete conversation'
+#         }, status=500)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_oauth_connections(request):
-    """Get user's OAuth connections from accounts app"""
-    try:
-        from accounts.google_oauth_service import UserGoogleAuthService
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def get_oauth_connections(request):
+#     """Get user's OAuth connections from accounts app"""
+#     try:
+#         from accounts.google_oauth_service import UserGoogleAuthService
         
         # Get Google OAuth connections
-        google_accounts = UserGoogleAuthService.get_user_google_accounts(request.user)
+#         google_accounts = UserGoogleAuthService.get_user_google_accounts(request.user)
         
-        data = []
-        for account in google_accounts:
-            data.append({
-                'id': account['id'],
-                'platform': 'google',
-                'account_id': account['google_ads_customer_id'],
-                'email': account['google_email'],
-                'name': account['google_name'],
-                'created_at': account['last_used'].isoformat(),
-                'is_token_valid': account['is_token_valid']
-            })
+#         data = []
+#         for account in google_accounts:
+#             data.append({
+#                 'id': account['id'],
+#                 'platform': 'google',
+#                 'account_id': account['google_ads_customer_id'],
+#                 'email': account['google_email'],
+#                 'name': account['google_name'],
+#                 'created_at': account['last_used'].isoformat(),
+#                 'is_token_valid': account['is_token_valid']
+#             })
         
-        return Response(data)
+#         return Response(data)
         
-    except Exception as e:
-        logger.error(f"Get OAuth connections error: {str(e)}")
-        return Response({
-            'error': 'Failed to fetch connections'
-        }, status=500)
+#     except Exception as e:
+#         logger.error(f"Get OAuth connections error: {str(e)}")
+#         return Response({
+#             'error': 'Failed to fetch connections'
+#         }, status=500)
 
 
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def revoke_oauth_connection(request, connection_id):
-    """Revoke OAuth connection"""
-    try:
-        from accounts.google_oauth_service import UserGoogleAuthService
+# @api_view(['DELETE'])
+# @permission_classes([IsAuthenticated])
+# def revoke_oauth_connection(request, connection_id):
+#     """Revoke OAuth connection"""
+#     try:
+#         from accounts.google_oauth_service import UserGoogleAuthService
         
         # Revoke Google OAuth connection
-        success = UserGoogleAuthService.revoke_user_auth(request.user)
+#         success = UserGoogleAuthService.revoke_user_auth(request.user)
         
-        if success:
-            return Response({
-                'message': 'Connection revoked successfully'
-            })
-        else:
-            return Response({
-                'error': 'Failed to revoke connection'
-            }, status=500)
+#         if success:
+#             return Response({
+#                 'message': 'Connection revoked successfully'
+#             })
+#         else:
+#             return Response({
+#                 'error': 'Failed to revoke connection'
+#             }, status=500)
         
-    except Exception as e:
-        logger.error(f"Revoke connection error: {str(e)}")
-        return Response({
-            'error': 'Failed to revoke connection'
-        }, status=500)
+#     except Exception as e:
+#         logger.error(f"Revoke connection error: {str(e)}")
+#         return Response({
+#             'error': 'Failed to revoke connection'
+#         }, status=500)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def health_check(request):
-    """Health check endpoint"""
-    return Response({
-        'status': 'healthy',
-        'timestamp': datetime.now().isoformat(),
-        'user': request.user.username
-    })
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def health_check(request):
+#     """Health check endpoint"""
+#     return Response({
+#         'status': 'healthy',
+#         'timestamp': datetime.now().isoformat(),
+#         'user': request.user.username
+#     })
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def test_auth(request):
-    """Test authentication endpoint"""
-    return Response({
-        'message': 'Authentication successful',
-        'user_id': request.user.id,
-        'username': request.user.username,
-        'is_authenticated': request.user.is_authenticated,
-        'timestamp': datetime.now().isoformat()
-    })
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def test_auth(request):
+#     """Test authentication endpoint"""
+#     return Response({
+#         'message': 'Authentication successful',
+#         'user_id': request.user.id,
+#         'username': request.user.username,
+#         'is_authenticated': request.user.is_authenticated,
+#         'timestamp': datetime.now().isoformat()
+#     })
 
 
 # COMMENTED OUT - Not used in LanggraphView
@@ -1933,54 +1933,54 @@ except ImportError:
         pass
     IPYTHON_AVAILABLE = False
 
-class LangChainView(APIView):  
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+# class LangChainView(APIView):  
+#     authentication_classes = [JWTAuthentication]
+#     permission_classes = [IsAuthenticated]
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.llm = init_chat_model("gpt-4o")
-        self.llm_with_tools = self.llm.bind_tools(tools)
+#     def __init__(self, **kwargs):
+#         super().__init__(**kwargs)
+#         self.llm = init_chat_model("gpt-4o")
+#         self.llm_with_tools = self.llm.bind_tools(tools)
 
-        def chat_node(state: State) -> State:
-            return {"message": self.llm_with_tools.invoke(state["messages"])}
+#         def chat_node(state: State) -> State:
+#             return {"message": self.llm_with_tools.invoke(state["messages"])}
 
-        self.builder = StateGraph(State)
-        self.builder.add_node(chat_node);
-        self.builder.add_node("tools", ToolNode(tools))
-        self.builder.add_edge(START,"chat_node")
-        self.builder.add_conditional_edges( "chat_node", tools_condition)
-        self.builder.add_edge("tools", "chat_node")
+#         self.builder = StateGraph(State)
+#         self.builder.add_node(chat_node);
+#         self.builder.add_node("tools", ToolNode(tools))
+#         self.builder.add_edge(START,"chat_node")
+#         self.builder.add_conditional_edges( "chat_node", tools_condition)
+#         self.builder.add_edge("tools", "chat_node")
 
-        self.graph = self.builder.compile()
+#         self.graph = self.builder.compile()
 
-        if IPYTHON_AVAILABLE:
-            try:
-                display(Image(self.graph.get_graph().draw_mermaid_png()))
-            except Exception:
-                # This requires some extra dependencies and is optional
-                pass
+#         if IPYTHON_AVAILABLE:
+#             try:
+#                 display(Image(self.graph.get_graph().draw_mermaid_png()))
+#             except Exception:
+#                 # This requires some extra dependencies and is optional
+#                 pass
         
 
 
-    def post(self, request):
-        """Handle LangChain request"""
-        try:
-            data = request.data
-            print(f"🔍 DEBUG: LangChain request data: {data}")
-            query = data.get('query', '')
-            conversation_id = data.get('conversation_id', '')
-            user_id = data.get('user_id', '')
+#     def post(self, request):
+#         """Handle LangChain request"""
+#         try:
+#             data = request.data
+#             print(f"🔍 DEBUG: LangChain request data: {data}")
+#             query = data.get('query', '')
+#             conversation_id = data.get('conversation_id', '')
+#             user_id = data.get('user_id', '')
             
-            message ={
-                "role":"user",
-                "content":query
-            }
-            response = self.graph.invoke({"messages":[message]})
-            return Response({"message": response}, status=status.HTTP_200_OK)
-        except Exception as e:
-            logger.error(f"Error in LangChain request: {e}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#             message ={
+#                 "role":"user",
+#                 "content":query
+#             }
+#             response = self.graph.invoke({"messages":[message]})
+#             return Response({"message": response}, status=status.HTTP_200_OK)
+#         except Exception as e:
+#             logger.error(f"Error in LangChain request: {e}")
+#             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class LangGraphState(TypedDict):

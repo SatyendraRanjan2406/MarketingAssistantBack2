@@ -4,8 +4,8 @@ from . import views
 app_name = 'ad_expert'
 
 urlpatterns = [
-    # Chat endpoints
-    path('api/chat/message/', views.ChatBotView.as_view(), name='chat_message'),
+    # Chat endpoints - COMMENTED OUT (not used)
+    # path('api/chat/message/', views.ChatBotView.as_view(), name='chat_message'),
     path('api/conversations/', views.get_conversations, name='conversations'),
     path('api/conversations/<int:conversation_id>/', views.get_conversation_messages, name='conversation_messages'),
     path('api/conversations/<int:conversation_id>/delete/', views.delete_conversation, name='delete_conversation'),
@@ -13,8 +13,8 @@ urlpatterns = [
     # RAG Chat endpoint with Intent Mapping
     path('api/rag/chat/', views.LanggraphView.as_view(), name='rag_chat'),
     
-    # LangChain Chat endpoint
-    path('api/langchain/chat/', views.LangChainView.as_view(), name='langchain_chat'),
+    # LangChain Chat endpoint - COMMENTED OUT (not used)
+    # path('api/langchain/chat/', views.LangChainView.as_view(), name='langchain_chat'),
     
     # LangGraph Chat endpoint with advanced state management
     path('api/langgraph/chat/', views.LanggraphView.as_view(), name='langgraph_chat'),
