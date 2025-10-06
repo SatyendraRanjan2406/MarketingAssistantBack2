@@ -7,10 +7,10 @@ import os
 import logging
 from typing import List, Dict, Any, Optional
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain_qdrant import QdrantVectorStore
+# from langchain_qdrant import QdrantVectorStore
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
-from qdrant_client import QdrantClient
+# from qdrant_client import QdrantClient
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class GoogleAdsRAGClient:
         self.embeddings = OpenAIEmbeddings(model=embedding_model)
         
         # Initialize Qdrant client
-        self.qdrant_client = QdrantClient(url=qdrant_url, prefer_grpc=False)
+        self.qdrant_client = None
         
         # Initialize LLM
         self.llm = ChatOpenAI(
@@ -40,11 +40,12 @@ class GoogleAdsRAGClient:
         )
         
         # Initialize vector store
-        self.vectorstore = QdrantVectorStore(
-            client=self.qdrant_client,
-            collection_name=self.collection_name,
-            embedding=self.embeddings
-        )
+        self.vectorstore =None 
+        #  QdrantVectorStore(
+        #     client=self.qdrant_client,
+        #     collection_name=self.collection_name,
+        #     embedding=self.embeddings
+        # )
         
         # Initialize retriever
         self.retriever = self.vectorstore.as_retriever(
