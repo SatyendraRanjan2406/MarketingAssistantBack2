@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'django_redis',
-    'google_ads_new',
+    # 'google_ads_new',
     'accounts',
     'ad_expert',
 ]

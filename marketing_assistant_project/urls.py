@@ -22,7 +22,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
     # Google Ads API endpoints
-    path('google-ads-new/', include('google_ads_new.urls')),
+    # path('google-ads-new/', include('google_ads_new.urls')),
     
     # Ad Expert app URLs
     path('ad-expert/', include('ad_expert.urls')),

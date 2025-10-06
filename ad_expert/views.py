@@ -24,8 +24,8 @@ from rest_framework.authentication import SessionAuthentication, TokenAuthentica
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .models import Conversation, ChatMessage
-from .llm_orchestrator import LLMOrchestrator
-from .redis_service import RedisService
+# from .llm_orchestrator import LLMOrchestrator
+# from .redis_service import RedisService
 # from .message_builder import CustomerSelectionMessageBuilder, IntentMappingMessageBuilder, MessageBuilder  # Not used in LanggraphView
 
 from langchain_core.messages import HumanMessage, AIMessage
@@ -231,7 +231,7 @@ def delete_conversation(request, conversation_id):
         
         conversation.deleted_at = datetime.now()
         conversation.save()
- 
+        
         conversation.messages.all().delete()
         conversation.delete()
         
@@ -1806,7 +1806,7 @@ class ConversationHistoryView(APIView):
         """Get conversation history"""
         try:
             if conversation_id:
-                # Get specific conversation
+            # Get specific conversation
                 try:
                     conversation = Conversation.objects.get(
                         id=conversation_id,
@@ -1867,7 +1867,7 @@ class ConversationHistoryView(APIView):
                 user=request.user
             )
             conversation.delete()
-            
+                
             return Response({
                 'message': 'Conversation deleted successfully'
             })
@@ -2096,9 +2096,9 @@ class LanggraphView(APIView):
                     tool_response = tool_node_instance.invoke({"messages": [last_message]})
                     
                     return {
-                        "messages": tool_response["messages"],
-                        "current_step": "tools_completed"
-                    }
+                            "messages": tool_response["messages"],
+                            "current_step": "tools_completed"
+                        }
                 else:
                     # No tool calls, return as is
                     return {
@@ -2142,14 +2142,14 @@ class LanggraphView(APIView):
                 else:
                     logger.info(f"Retrieved {len(accessible_customers)} accessible customers from long-term memory for user {state['user_id']}")
                 
-                return {
-                    "user_context": user_context,
-                    "accessible_customers": accessible_customers,
-                    "current_step": "context_enriched"
-                }
+                    return {
+                        "user_context": user_context,
+                        "accessible_customers": accessible_customers,
+                        "current_step": "context_enriched"
+                    }
             except Exception as e:
                 logger.error(f"Error in context_node: {e}")
-                return {
+            return {
                     "current_step": "context_error",
                     "error_count": state.get("error_count", 0) + 1
                 }
@@ -2283,7 +2283,7 @@ Include specific metrics, percentages, and data points in text format.
                     "messages": [report_response],
                     "current_step": "report_completed"
                 }
-                
+            
             except Exception as e:
                 logger.error(f"Error in report_generation_node: {e}")
                 error_message = AIMessage(content=f"Error generating report: {str(e)}")
@@ -2825,7 +2825,7 @@ IMPORTANT: You have access to the full conversation history. Use it to provide c
             
             # Save user message to database
             user_message = ChatMessage.objects.create(
-                conversation=conversation,
+            conversation=conversation,
                 role='user',
                 content=query
             )
@@ -2885,14 +2885,14 @@ IMPORTANT: You have access to the full conversation history. Use it to provide c
             assistant_message = ChatMessage.objects.create(
                 conversation=conversation,
                 role='assistant',
-                content=response_content,
-                response_type='langgraph_response',
-                structured_data={
-                    'langgraph_result': {
-                        'current_step': result.get('current_step'),
-                        'error_count': result.get('error_count', 0),
-                        'user_context': result.get('user_context', {}),
-                        'accessible_customers': result.get('accessible_customers', [])
+                    content=response_content,
+                    response_type='langgraph_response',
+                    structured_data={
+                        'langgraph_result': {
+                            'current_step': result.get('current_step'),
+                            'error_count': result.get('error_count', 0),
+                            'user_context': result.get('user_context', {}),
+                            'accessible_customers': result.get('accessible_customers', [])
                     }
                 }
             )
@@ -2905,7 +2905,7 @@ IMPORTANT: You have access to the full conversation history. Use it to provide c
             
             return Response({
                 'message_id': assistant_message.id,
-                'conversation_id': conversation.id,
+            'conversation_id': conversation.id,
                 'response': response_content,
                 'langgraph_state': {
                     'current_step': result.get('current_step'),
@@ -3005,7 +3005,7 @@ IMPORTANT: You have access to the full conversation history. Use it to provide c
             except (Conversation.DoesNotExist, ValueError) as e:
                 logger.warning(f"Could not find conversation {conversation_id}: {e}")
                 pass
-        
+    
         # Create new conversation
         new_conversation = Conversation.objects.create(
             user=user,

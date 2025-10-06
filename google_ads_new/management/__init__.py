@@ -1,1 +1,0 @@
-# Management commands for google_ads_new app

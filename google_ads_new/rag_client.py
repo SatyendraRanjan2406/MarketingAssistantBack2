@@ -7,10 +7,10 @@ import os
 import logging
 from typing import List, Dict, Any, Optional
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-# from langchain_qdrant import QdrantVectorStore
+# # from langchain_qdrant import QdrantVectorStore  # COMMENTED OUT - Qdrant not used
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
-# from qdrant_client import QdrantClient
+# # from qdrant_client import QdrantClient  # COMMENTED OUT - Qdrant not used
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,8 @@ class GoogleAdsRAGClient:
         # Initialize embeddings
         self.embeddings = OpenAIEmbeddings(model=embedding_model)
         
-        # Initialize Qdrant client
+        # Initialize Qdrant client - COMMENTED OUT
+        # self.qdrant_client = QdrantClient(url=qdrant_url, prefer_grpc=False)
         self.qdrant_client = None
         
         # Initialize LLM
@@ -39,25 +40,27 @@ class GoogleAdsRAGClient:
             temperature=temperature
         )
         
-        # Initialize vector store
-        self.vectorstore =None 
-        #  QdrantVectorStore(
+        # Initialize vector store - COMMENTED OUT
+        self.vectorstore = None
+        # QdrantVectorStore(
         #     client=self.qdrant_client,
         #     collection_name=self.collection_name,
         #     embedding=self.embeddings
         # )
         
-        # Initialize retriever
-        self.retriever = self.vectorstore.as_retriever(
-            search_kwargs={"k": 4},
-            search_type="similarity"
-        )
+        # Initialize retriever - COMMENTED OUT (depends on Qdrant)
+        # self.retriever = self.vectorstore.as_retriever(
+        #     search_kwargs={"k": 4},
+        #     search_type="similarity"
+        # )
+        self.retriever = None
         
         # Create custom prompt
         self.prompt_template = self._create_prompt_template()
         
-        # Initialize QA chain
-        self.qa_chain = self._create_qa_chain()
+        # Initialize QA chain - COMMENTED OUT (depends on Qdrant)
+        # self.qa_chain = self._create_qa_chain()
+        self.qa_chain = None
     
     def _create_prompt_template(self) -> PromptTemplate:
         """Create custom prompt template for Google Ads queries"""
@@ -80,124 +83,104 @@ class GoogleAdsRAGClient:
             input_variables=["context", "question"]
         )
     
+    # COMMENTED OUT - Qdrant not used in core functionality
     def _create_qa_chain(self) -> RetrievalQA:
-        """Create the QA chain"""
-        return RetrievalQA.from_chain_type(
-            llm=self.llm,
-            chain_type="stuff",  # Use 'stuff' instead of 'map_rerank' for stability
-            retriever=self.retriever,
-            return_source_documents=True,
-            chain_type_kwargs={
-                "prompt": self.prompt_template
-            }
-        )
+        """Create the QA chain - COMMENTED OUT"""
+        return None
+        # return RetrievalQA.from_chain_type(
+        #     llm=self.llm,
+        #     chain_type="stuff",  # Use 'stuff' instead of 'map_rerank' for stability
+        #     retriever=self.retriever,
+        #     return_source_documents=True,
+        #     chain_type_kwargs={
+        #         "prompt": self.prompt_template
+        #     }
+        # )
     
+    # COMMENTED OUT - Qdrant not used in core functionality
     def query(self, question: str) -> Dict[str, Any]:
-        """Query the RAG system"""
-        try:
-            logger.info(f"Processing query: {question}")
-            
-            # Run the QA chain
-            result = self.qa_chain({"query": question})
-            
-            # Extract relevant information
-            answer = result.get("result", "")
-            
-            # Get sources directly from Qdrant for better metadata
-            similar_docs = self.get_similar_docs(question, limit=4)
-            sources = []
-            for doc in similar_docs:
-                source_info = {
-                    "source": doc.get("source", ""),
-                    "chunk": doc.get("chunk", 0),
-                    "section": doc.get("section", "general"),
-                    "text_preview": doc.get("text", "")[:200] + "..." if len(doc.get("text", "")) > 200 else doc.get("text", "")
-                }
-                sources.append(source_info)
-            
-            return {
-                "answer": answer,
-                "sources": sources,
-                "query": question,
-                "success": True
-            }
-            
-        except Exception as e:
-            logger.error(f"Error processing query: {e}")
-            return {
-                "answer": f"Sorry, I encountered an error while processing your query: {str(e)}",
-                "sources": [],
-                "query": question,
-                "success": False,
-                "error": str(e)
-            }
+        """Query the RAG system - COMMENTED OUT"""
+        return {
+            "answer": "RAG system not available - Qdrant disabled",
+            "sources": [],
+            "success": False
+        }
+        # try:
+        #     logger.info(f"Processing query: {question}")
+        #     
+        #     # Run the QA chain
+        #     result = self.qa_chain({"query": question})
+        #     
+        #     # Extract relevant information
+        #     answer = result.get("result", "")
+        #     
+        #     # Get sources directly from Qdrant for better metadata
+        #     similar_docs = self.get_similar_docs(question, limit=4)
+        #     sources = []
+        #     for doc in similar_docs:
+        #         source_info = {
+        #             "source": doc.get("source", ""),
+        #             "chunk": doc.get("chunk", 0),
+        #             "section": doc.get("section", "general"),
+        #             "text_preview": doc.get("text", "")[:200] + "..." if len(doc.get("text", "")) > 200 else doc.get("text", "")
+        #         }
+        #         sources.append(source_info)
+        #     
+        #     return {
+        #         "answer": answer,
+        #         "sources": sources,
+        #         "query": question,
+        #         "success": True
+        #     }
     
+    # COMMENTED OUT - Qdrant not used in core functionality
     def get_similar_docs(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
-        """Get similar documents without generating an answer"""
-        try:
-            # Get embedding for the query
-            query_embedding = self.embeddings.embed_query(query)
-            
-            # Search directly in Qdrant
-            search_results = self.qdrant_client.search(
-                collection_name=self.collection_name,
-                query_vector=query_embedding,
-                limit=limit,
-                with_payload=True
-            )
-            
-            # Convert Qdrant results to our format
-            similar_docs = []
-            for result in search_results:
-                similar_docs.append({
-                    "source": result.payload.get("source", ""),
-                    "chunk": result.payload.get("chunk", 0),
-                    "section": result.payload.get("section", "general"),
-                    "text": result.payload.get("text", ""),
-                    "metadata": {
-                        "source": result.payload.get("source", ""),
-                        "chunk": result.payload.get("chunk", 0),
-                        "total_chunks": result.payload.get("total_chunks", 0),
-                        "section": result.payload.get("section", "general"),
-                        "title": result.payload.get("title", ""),
-                        "url_index": result.payload.get("url_index", 0),
-                        "_id": str(result.id),
-                        "_collection_name": self.collection_name
-                    }
-                })
-            
-            return similar_docs
-            
-        except Exception as e:
-            logger.error(f"Error getting similar documents: {e}")
-            return []
+        """Get similar documents - COMMENTED OUT"""
+        return []
     
+    # COMMENTED OUT - Original Qdrant implementation
+    # def get_similar_docs_original(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+    #     """Get similar documents without generating an answer"""
+    #     # [ENTIRE METHOD COMMENTED OUT - Qdrant not used in core functionality]
+    #     pass
+    
+    # COMMENTED OUT - Qdrant not used in core functionality
     def get_collection_stats(self) -> Dict[str, Any]:
-        """Get collection statistics"""
-        try:
-            collection_info = self.qdrant_client.get_collection(self.collection_name)
-            return {
-                "collection_name": self.collection_name,
-                "total_points": collection_info.points_count,
-                "indexed_vectors": collection_info.indexed_vectors_count,
-                "vectors_count": collection_info.vectors_count
-            }
-        except Exception as e:
-            logger.error(f"Error getting collection stats: {e}")
-            return {"error": str(e)}
+        """Get collection statistics - COMMENTED OUT"""
+        return {
+            "collection_name": "disabled",
+            "total_points": 0,
+            "indexed_vectors": 0,
+            "status": "Qdrant disabled"
+        }
+        # try:
+        #     collection_info = self.qdrant_client.get_collection(self.collection_name)
+        #     return {
+        #         "collection_name": self.collection_name,
+        #         "total_points": collection_info.points_count,
+        #         "indexed_vectors": collection_info.indexed_vectors_count,
+        #         "vectors_count": collection_info.vectors_count
+        #     }
+        # except Exception as e:
+        #     logger.error(f"Error getting collection stats: {e}")
+        #     return {"error": str(e)}
 
-# Global RAG client instance
-_rag_client = None
+# Global RAG client instance - COMMENTED OUT
+# _rag_client = None
 
+# COMMENTED OUT - Qdrant not used in core functionality
 def get_rag_client() -> GoogleAdsRAGClient:
-    """Get or create the global RAG client instance"""
-    global _rag_client
-    if _rag_client is None:
-        _rag_client = GoogleAdsRAGClient()
-    return _rag_client
+    """Get or create the global RAG client instance - COMMENTED OUT"""
+    return None
+    # global _rag_client
+    # if _rag_client is None:
+    #     _rag_client = GoogleAdsRAGClient()
+    # return _rag_client
 
+# COMMENTED OUT - Qdrant not used in core functionality
 def initialize_rag_client(collection_name: str = "google_ads_docs") -> GoogleAdsRAGClient:
-    """Initialize the RAG client with a specific collection"""
-    global _rag_client
-    _rag_client = GoogleAdsRAGClient(collection_name=collection_name)
-    return _rag_client
+    """Initialize the RAG client with a specific collection - COMMENTED OUT"""
+    return None
+    # global _rag_client
+    # _rag_client = GoogleAdsRAGClient(collection_name=collection_name)
+    # return _rag_client
